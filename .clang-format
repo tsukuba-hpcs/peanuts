@@ -1,0 +1,4 @@
+---
+  BasedOnStyle: Chromium
+  CommentPragmas: \*|\s*\([cC] # Do not touch copyright comments and comments start with '*'
+...
