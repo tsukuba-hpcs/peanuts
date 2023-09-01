@@ -79,3 +79,11 @@ CheckOptions:
     value:  ''
   - key:    readability-identifier-naming.ConstexprVariableCase
     value:  lower_case
+
+# Identifier-length
+  - key: readability-identifier-length.IgnoredParameterNames
+    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os'
+  - key: readability-identifier-length.IgnoredVariableNames
+    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os'
+  - key: readability-identifier-length.IgnoredLoopCounterNames
+    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os'
