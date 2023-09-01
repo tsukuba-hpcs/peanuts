@@ -4,3 +4,4 @@
 #include "rpmbb/tls.hpp"
 #include "rpmbb/variant_encoding.hpp"
 #include "rpmbb/version.h"
+#include "rpmbb/welford.hpp"
