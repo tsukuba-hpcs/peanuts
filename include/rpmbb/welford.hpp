@@ -7,8 +7,6 @@ namespace rpmbb {
 
 class welford {
  public:
-  welford() : n_(0), mean_(0.0), m2_(0.0) {}
-
   void add(uint64_t x) {
     ++n_;
     double delta = static_cast<double>(x) - mean_;
@@ -17,14 +15,14 @@ class welford {
     m2_ += delta * delta2;
   }
 
-  double mean() const {
+  auto mean() const -> double {
     if (n_ < 1) {
       throw std::runtime_error("Mean is undefined for empty data set");
     }
     return mean_;
   }
 
-  double var() const {
+  auto var() const -> double {
     if (n_ < 2) {
       throw std::runtime_error(
           "Variance is undefined for data set with fewer than 2 elements");
@@ -32,12 +30,12 @@ class welford {
     return m2_ / static_cast<double>(n_ - 1);
   }
 
-  double std() const { return std::sqrt(var()); }
+  auto std() const -> double { return std::sqrt(var()); }
 
  private:
-  uint64_t n_;
-  double mean_;
-  double m2_;
+  uint64_t n_{0};
+  double mean_{0.0};
+  double m2_{0.0};
 };
 
 }  // namespace rpmbb
