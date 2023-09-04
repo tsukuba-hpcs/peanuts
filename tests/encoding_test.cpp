@@ -55,7 +55,28 @@ TEST_CASE("Delta Encoding and Decoding with Corner Cases") {
   CHECK(original_values == decoded_values);
 }
 
-TEST_CASE_TEMPLATE("Varint Encoding and Decoding",
+TEST_CASE_TEMPLATE("Verint Encoing and Decoding using function",
+                   T,
+                   uint64_t,
+                   uint32_t,
+                   size_t) {
+  std::string buffer;
+  std::vector<T> original = {10, 100, 1000, 10000};
+  std::vector<T> decoded;
+
+  for (const auto& val : original) {
+    rpmbb::encode_varint(val, buffer);
+  }
+
+  size_t index = 0;
+  for (size_t i = 0; i < original.size(); ++i) {
+    decoded.push_back(rpmbb::decode_varint<T>(buffer, index));
+  }
+
+  CHECK(original == decoded);
+}
+
+TEST_CASE_TEMPLATE("Varint Encoding and Decoding using varint_compressor",
                    T,
                    uint64_t,
                    uint32_t,
@@ -137,4 +158,35 @@ TEST_CASE_TEMPLATE("Compression Ratio Test", T, uint64_t, uint32_t, size_t) {
 
   CHECK(calculated_ratio ==
         doctest::Approx(compressor.compression_ratio()).epsilon(0.001));
+}
+
+TEST_CASE_TEMPLATE("Multiple calls to operator*",
+                   T,
+                   uint32_t,
+                   uint64_t,
+                   size_t) {
+  varint_compressor<T> compressor;
+
+  std::vector<T> original = {10, 100, 1000, 10000};
+  std::vector<T> decoded;
+
+  // Encode values
+  for (const auto& val : original) {
+    compressor.encode(val);
+  }
+
+  auto it = compressor.begin();
+  auto end = compressor.end();
+  while (it != end) {
+    auto value = *it;  // First call to operator*()
+    CHECK(value ==
+          *it);  // Second call to operator*(), should be the same value
+    CHECK(value ==
+          *it);  // Third call to operator*(), should still be the same value
+
+    decoded.push_back(value);
+    ++it;
+  }
+
+  CHECK(original == decoded);
 }
