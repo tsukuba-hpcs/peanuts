@@ -55,10 +55,14 @@ TEST_CASE("Delta Encoding and Decoding with Corner Cases") {
   CHECK(original_values == decoded_values);
 }
 
-TEST_CASE("Varint Encoding and Decoding") {
-  varint_compressor compressor;
-  std::vector<uint64_t> original = {10, 100, 1000, 10000};
-  std::vector<uint64_t> decoded;
+TEST_CASE_TEMPLATE("Varint Encoding and Decoding",
+                   T,
+                   uint64_t,
+                   uint32_t,
+                   size_t) {
+  rpmbb::varint_compressor<T> compressor;
+  std::vector<T> original = {10, 100, 1000, 10000};
+  std::vector<T> decoded;
 
   for (const auto& val : original) {
     compressor.encode(val);
@@ -71,8 +75,8 @@ TEST_CASE("Varint Encoding and Decoding") {
   CHECK(original == decoded);
 }
 
-TEST_CASE("Encoded data count") {
-  varint_compressor compressor;
+TEST_CASE_TEMPLATE("Encoded data count", T, uint64_t, uint32_t, size_t) {
+  rpmbb::varint_compressor<T> compressor;
   CHECK(compressor.size() == 0);  // Initial size should be 0
 
   compressor.encode(10);
@@ -82,17 +86,21 @@ TEST_CASE("Encoded data count") {
   CHECK(compressor.size() == 2);  // Two data points encoded
 }
 
-TEST_CASE("Varint Encoding Corner and 7-bit Boundary Cases") {
-  varint_compressor compressor;
-  std::vector<uint64_t> original = {
+TEST_CASE_TEMPLATE("Varint Encoding Corner and 7-bit Boundary Cases",
+                   T,
+                   uint64_t,
+                   uint32_t,
+                   size_t) {
+  rpmbb::varint_compressor<T> compressor;
+  std::vector<T> original = {
       0,
-      std::numeric_limits<uint64_t>::max(),  // UINT64_MAX
-      1ull << 7,                             // 2^7
-      1ull << 14,                            // 2^14
-      1ull << 21,                            // 2^21
-      1ull << 28                             // 2^28
+      std::numeric_limits<T>::max(),  // max for T
+      1ull << 7,                      // 2^7
+      1ull << 14,                     // 2^14
+      1ull << 21,                     // 2^21
+      1ull << 28                      // 2^28
   };
-  std::vector<uint64_t> decoded;
+  std::vector<T> decoded;
 
   for (const auto& val : original) {
     compressor.encode(val);
@@ -105,25 +113,27 @@ TEST_CASE("Varint Encoding Corner and 7-bit Boundary Cases") {
   CHECK(original == decoded);
 }
 
-TEST_CASE("Compression Ratio Test") {
-  varint_compressor compressor;
-  std::vector<uint64_t> original = {
-      0,          1,          127,        1ull << 7,
-      1ull << 14, 1ull << 21, 1ull << 28, std::numeric_limits<uint64_t>::max()};
+TEST_CASE_TEMPLATE("Compression Ratio Test", T, uint64_t, uint32_t, size_t) {
+  rpmbb::varint_compressor<T> compressor;
+  std::vector<T> original = {
+      0,                             // 0
+      1,                             // 1
+      127,                           // 127
+      1ull << 7,                     // 2^7
+      1ull << 14,                    // 2^14
+      1ull << 21,                    // 2^21
+      1ull << 28,                    // 2^28
+      std::numeric_limits<T>::max()  // max for T
+  };
 
   for (const auto& val : original) {
     compressor.encode(val);
   }
 
-  size_t original_size = original.size() * sizeof(uint64_t);
+  size_t original_size = original.size() * sizeof(T);
   size_t compressed_size = compressor.compressed_size();
   double calculated_ratio =
       static_cast<double>(compressed_size) / original_size;
-
-  // MESSAGE("Original size: ", original_size, " bytes");
-  // MESSAGE("Compressed size: ", compressed_size, " bytes");
-  // MESSAGE("Calculated ratio: ", calculated_ratio);
-  // MESSAGE("Actual ratio: ", compressor.compression_ratio());
 
   CHECK(calculated_ratio ==
         doctest::Approx(compressor.compression_ratio()).epsilon(0.001));
