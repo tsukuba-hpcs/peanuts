@@ -7,7 +7,7 @@
 
 namespace rpmbb {
 
-class variant_compressor {
+class varint_compressor {
  private:
   std::vector<uint8_t> encoded_;
   size_t data_count_ = 0;

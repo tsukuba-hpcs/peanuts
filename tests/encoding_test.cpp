@@ -2,7 +2,7 @@
 
 #include <doctest/doctest.h>
 #include "rpmbb/delta_encoding.hpp"
-#include "rpmbb/variant_encoding.hpp"
+#include "rpmbb/varint_encoding.hpp"
 using namespace rpmbb;
 
 #include <iostream>
@@ -55,8 +55,8 @@ TEST_CASE("Delta Encoding and Decoding with Corner Cases") {
   CHECK(original_values == decoded_values);
 }
 
-TEST_CASE("Variant Encoding and Decoding") {
-  variant_compressor compressor;
+TEST_CASE("Varint Encoding and Decoding") {
+  varint_compressor compressor;
   std::vector<uint64_t> original = {10, 100, 1000, 10000};
   std::vector<uint64_t> decoded;
 
@@ -72,7 +72,7 @@ TEST_CASE("Variant Encoding and Decoding") {
 }
 
 TEST_CASE("Encoded data count") {
-  variant_compressor compressor;
+  varint_compressor compressor;
   CHECK(compressor.size() == 0);  // Initial size should be 0
 
   compressor.encode(10);
@@ -82,8 +82,8 @@ TEST_CASE("Encoded data count") {
   CHECK(compressor.size() == 2);  // Two data points encoded
 }
 
-TEST_CASE("Variant Encoding Corner and 7-bit Boundary Cases") {
-  variant_compressor compressor;
+TEST_CASE("Varint Encoding Corner and 7-bit Boundary Cases") {
+  varint_compressor compressor;
   std::vector<uint64_t> original = {
       0,
       std::numeric_limits<uint64_t>::max(),  // UINT64_MAX
@@ -106,7 +106,7 @@ TEST_CASE("Variant Encoding Corner and 7-bit Boundary Cases") {
 }
 
 TEST_CASE("Compression Ratio Test") {
-  variant_compressor compressor;
+  varint_compressor compressor;
   std::vector<uint64_t> original = {
       0,          1,          127,        1ull << 7,
       1ull << 14, 1ull << 21, 1ull << 28, std::numeric_limits<uint64_t>::max()};
