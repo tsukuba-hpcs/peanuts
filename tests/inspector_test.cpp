@@ -74,3 +74,23 @@ TEST_CASE("Inspect intrusive_with_non_intrusive") {
   ss << rpmbb::util::make_inspector(obj);
   CHECK(ss.str() == "(5,10)");
 }
+
+TEST_CASE("to_string with intrusive_class") {
+  user_defined_ns::intrusive_class obj;
+  CHECK(rpmbb::util::to_string(obj) == "0-10");
+}
+
+TEST_CASE("to_string with non_intrusive_class") {
+  user_defined_ns::non_intrusive_class obj;
+  CHECK(rpmbb::util::to_string(obj) == "5,10");
+}
+
+TEST_CASE("to_string with non_intrusive_with_intrusive") {
+  user_defined_ns::non_intrusive_with_intrusive obj;
+  CHECK(rpmbb::util::to_string(obj) == "(0-10)");
+}
+
+TEST_CASE("to_string with intrusive_with_non_intrusive") {
+  user_defined_ns::intrusive_with_non_intrusive obj;
+  CHECK(rpmbb::util::to_string(obj) == "(5,10)");
+}

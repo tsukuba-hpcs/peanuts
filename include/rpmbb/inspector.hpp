@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ostream>
+#include <sstream>
 
 namespace rpmbb::util {
 namespace detail {
@@ -33,6 +34,13 @@ std::ostream& operator<<(std::ostream& os, const inspector<T>& insp) {
 template <typename T>
 detail::inspector<T> make_inspector(const T& obj) {
   return detail::inspector<T>(obj);
+}
+
+template <typename T>
+std::string to_string(const T& obj) {
+  std::stringstream ss;
+  ss << make_inspector(obj);
+  return ss.str();
 }
 
 }  // namespace rpmbb::util
