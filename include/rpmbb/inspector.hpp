@@ -8,25 +8,25 @@ namespace detail {
 
 template <typename T>
 struct inspector {
-  const T& obj_;
-  explicit inspector(const T& obj) : obj_(obj) {}
+  const T& obj;
+  explicit inspector(const T& obj) : obj(obj) {}
 };
 
 template <typename T>
-auto adl_inspect(std::ostream& os, const T& obj)
+auto sfinae_inspect(std::ostream& os, const T& obj)
     -> decltype(inspect(os, obj), os) {
-  return inspect(os, obj);
+  return inspect(os, obj); // ADL
 }
 
 template <typename T>
-auto adl_inspect(std::ostream& os, const T& obj)
+auto sfinae_inspect(std::ostream& os, const T& obj)
     -> decltype(obj.inspect(os), os) {
   return obj.inspect(os);
 }
 
 template <typename T>
 std::ostream& operator<<(std::ostream& os, const inspector<T>& insp) {
-  return adl_inspect(os, insp.obj_);
+  return sfinae_inspect(os, insp.obj);
 }
 
 }  // namespace detail
