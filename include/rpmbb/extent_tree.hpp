@@ -18,6 +18,8 @@ struct extent {
     assert(begin <= end);
   }
 
+  size_t size() const { return end - begin; }
+
   bool operator<(const extent& other) const { return begin < other.begin; }
 
   bool operator==(const extent& other) const {
@@ -96,6 +98,8 @@ class extent_tree {
   const_iterator end() const { return nodes_.cend(); }
   const_iterator cend() const { return nodes_.cend(); }
 
+  void clear() noexcept { nodes_.clear(); }
+
   size_t size() const { return nodes_.size(); }
 
   // Find the first extent_tree::node that falls in a [begin, end) range.
@@ -146,7 +150,30 @@ class extent_tree {
       }
     }
 
-    nodes_.insert(it, new_node);
+    it = nodes_.insert(it, new_node);
+
+    // coalesce with previous node
+    if (auto prev = it; prev != nodes_.begin()) {
+      --prev;
+      if (prev->client_id == it->client_id && prev->ex.end == it->ex.begin &&
+          prev->ptr + prev->ex.size() == it->ptr) {
+        node coalesced(prev->ex.begin, it->ex.end, prev->ptr, prev->client_id);
+        nodes_.erase(prev);
+        it = nodes_.erase(it);
+        it = nodes_.insert(it, coalesced);
+      }
+    }
+
+    // coalesce with next node
+    if (auto next = it; ++next != nodes_.end()) {
+      if (next->client_id == it->client_id && next->ex.begin == it->ex.end &&
+          next->ptr == it->ptr + it->ex.size()) {
+        node coalesced(it->ex.begin, next->ex.end, it->ptr, it->client_id);
+        nodes_.erase(it);
+        it = nodes_.erase(next);
+        nodes_.insert(it, coalesced);
+      }
+    }
   }
 
   void remove(uint64_t begin, uint64_t end) {
