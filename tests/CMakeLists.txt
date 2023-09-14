@@ -13,6 +13,7 @@ macro(build_test testname testfilepath)
             ${PROJECT_NAME}::${PROJECT_NAME}
   )
   target_include_directories(${testname} PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>)
+  target_compile_features(${testname} PUBLIC cxx_std_23)
   set_target_properties(
     ${testname}
     PROPERTIES CXX_EXTENSIONS OFF
