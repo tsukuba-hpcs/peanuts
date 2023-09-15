@@ -1,7 +1,7 @@
 macro(build_bench target file)
   add_executable(${target})
   target_sources(${target} PRIVATE ${file})
-  target_compile_features(${target} PUBLIC cxx_std_23)
+  target_compile_features(${target} PUBLIC cxx_std_20)
   set_target_properties(
     ${target}
     PROPERTIES CXX_EXTENSIONS OFF

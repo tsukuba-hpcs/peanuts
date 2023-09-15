@@ -6,7 +6,7 @@ set(${EXE_TARGET_NAME}_SRC # cmf: sortable
 
 add_executable(${EXE_TARGET_NAME})
 target_sources(${EXE_TARGET_NAME} PRIVATE ${${EXE_TARGET_NAME}_SRC})
-target_compile_features(${EXE_TARGET_NAME} PUBLIC cxx_std_23)
+target_compile_features(${EXE_TARGET_NAME} PUBLIC cxx_std_20)
 set_target_properties(
   ${EXE_TARGET_NAME}
   PROPERTIES CXX_EXTENSIONS OFF
