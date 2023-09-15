@@ -78,6 +78,12 @@ class welford {
     return from_range(std::begin(container), std::end(container));
   }
 
+  void clear() {
+    n_ = 0;
+    mean_ = 0.0;
+    m2_ = 0.0;
+  }
+
  private:
   uint64_t n_{0};
   double mean_{0.0};

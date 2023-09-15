@@ -7,6 +7,7 @@ Checks: >-
   concurrency-*,
   cppcoreguidelines-*,
   -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-init-variables,
   modernize-*,
   -modernize-use-nodiscard,
   mpi-*,
@@ -15,7 +16,8 @@ Checks: >-
   portability-*,
   readability-*,
   -readability-magic-numbers,
-  -readability-function-cognitive-complexity
+  -readability-function-cognitive-complexity,
+  -readability-isolate-declaration
 
 HeaderFilterRegex: 'rpmembb/(src|include)/.*$'
 
@@ -82,8 +84,8 @@ CheckOptions:
 
 # Identifier-length
   - key: readability-identifier-length.IgnoredParameterNames
-    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os'
+    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os|rc'
   - key: readability-identifier-length.IgnoredVariableNames
-    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os'
+    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os|rc'
   - key: readability-identifier-length.IgnoredLoopCounterNames
-    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os'
+    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os|rc'

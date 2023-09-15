@@ -51,10 +51,17 @@ class tsc {
     return get_optional().value();
   }
 
-  static auto to_msec(uint64_t cycles,
+  static auto to_msec(double cycles,
                       uint64_t cycles_per_msec = tsc::cycles_per_msec())
-      -> uint64_t {
+      -> double {
     return (cycles * 1000 + (cycles_per_msec / 2)) / (cycles_per_msec * 1000);
+  }
+
+  static auto to_nsec(double cycles,
+                      uint64_t cycles_per_msec = tsc::cycles_per_msec())
+      -> double {
+    return (cycles * 1000000 + (cycles_per_msec / 2)) /
+           (cycles_per_msec * 1000);
   }
 
   static void calibrate(std::optional<unsigned int> cpuid = std::nullopt) {

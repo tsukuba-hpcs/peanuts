@@ -80,6 +80,7 @@ class varint_compressor {
   auto begin() const -> iterator { return {buffer_, data_count_}; }
   auto end() const -> iterator { return {buffer_, 0}; }
   auto size() const -> size_t { return data_count_; }
+  auto empty() const -> bool { return data_count_ == 0; }
   auto encoded_buffer() const -> const std::string& { return buffer_; }
   auto compressed_size() const -> size_t { return buffer_.size(); }
 

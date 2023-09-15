@@ -32,3 +32,6 @@ target_link_libraries(
 )
 
 install(TARGETS ${EXE_TARGET_NAME} DESTINATION "${CMAKE_INSTALL_BINDIR}")
+
+
+add_subdirectory(benchmarks)

@@ -33,7 +33,7 @@ TEST_CASE("tsc::to_msec()") {
     std::this_thread::sleep_for(std::chrono::milliseconds(3));
     tsc2 = tsc::get();
     auto msec = tsc::to_msec(tsc2 - tsc1, tsc::cycles_per_msec());
-    CHECK(msec == doctest::Approx(3));
+    CHECK(msec == doctest::Approx(3).epsilon(0.1));
   }
 
   std::vector<uint64_t> msec = {1000, 10000, 23042, 123103, 121231};
