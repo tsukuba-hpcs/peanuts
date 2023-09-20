@@ -8,6 +8,7 @@ spack:
   - mpich device=ch4 netmod=ucx
   - ucx@1.14.1 +cma
   - intel-mpi-benchmarks ^mpich
+  - pmdk@2
   view: true
   concretizer:
     unify: true
@@ -114,5 +115,4 @@ spack:
         prefix: /usr
       - spec: git@2.41.0+tcltk
         prefix: /usr/local
-
 

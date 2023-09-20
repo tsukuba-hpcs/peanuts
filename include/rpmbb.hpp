@@ -3,6 +3,7 @@
 #include "rpmbb/delta_encoding.hpp"
 #include "rpmbb/extent_tree.hpp"
 #include "rpmbb/inspector.hpp"
+#include "rpmbb/pmem2.hpp"
 #include "rpmbb/sense_barrier.hpp"
 #include "rpmbb/tls.hpp"
 #include "rpmbb/tsc.hpp"

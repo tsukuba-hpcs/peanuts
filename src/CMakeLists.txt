@@ -28,10 +28,8 @@ target_link_libraries(
           fmt::fmt
           nlohmann_json::nlohmann_json
           ${PROJECT_NAME}::${PROJECT_NAME}
-  # PkgConfig::Libpmem2
 )
 
 install(TARGETS ${EXE_TARGET_NAME} DESTINATION "${CMAKE_INSTALL_BINDIR}")
-
 
 add_subdirectory(benchmarks)

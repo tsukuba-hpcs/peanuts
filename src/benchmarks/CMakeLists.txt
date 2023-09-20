@@ -22,7 +22,6 @@ macro(build_bench target file)
             fmt::fmt
             nlohmann_json::nlohmann_json
             ${PROJECT_NAME}::${PROJECT_NAME}
-    # PkgConfig::Libpmem2
   )
 endmacro()
 

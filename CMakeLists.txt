@@ -80,9 +80,13 @@ find_package(fmt REQUIRED)
 find_package(cxxopts REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(MPI REQUIRED CXX)
-# ~~~
-# find_package(PkgConfig REQUIRED)
-# pkg_check_modules(Libpmem2 REQUIRED IMPORTED_TARGET libpmem2)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(
+  Libpmem2
+  REQUIRED
+  IMPORTED_TARGET
+  libpmem2
+)
 
 # ---- headers ----
 file(
@@ -99,7 +103,7 @@ target_include_directories(
   ${PROJECT_NAME} INTERFACE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
                             "$<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>"
 )
-target_link_libraries(${PROJECT_NAME} INTERFACE MPI::MPI_CXX)
+target_link_libraries(${PROJECT_NAME} INTERFACE MPI::MPI_CXX PkgConfig::Libpmem2)
 
 include(cmake/version.cmake)
 target_add_version_header(
