@@ -8,6 +8,7 @@
 #include <libpmem2.h>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <system_error>
 
@@ -18,9 +19,9 @@ namespace rpmbb::pmem2 {
 
 class pmem2_error_category : public std::error_category {
  public:
-  const char* name() const noexcept override { return "pmem2"; }
+  auto name() const noexcept -> const char* override { return "pmem2"; }
 
-  std::string message(int ev) const override {
+  auto message(int ev) const -> std::string override {
     std::error_condition posix_cond =
         std::system_category().default_error_condition(ev);
     if (posix_cond.category() == std::generic_category()) {
@@ -29,23 +30,24 @@ class pmem2_error_category : public std::error_category {
     return pmem2_errormsg();
   }
 
-  std::error_condition default_error_condition(int ev) const noexcept override {
+  auto default_error_condition(int ev) const noexcept
+      -> std::error_condition override {
     std::error_condition posix_cond =
         std::system_category().default_error_condition(ev);
     if (posix_cond.category() == std::generic_category()) {
       return posix_cond;
     }
-    return std::error_condition(ev, *this);
+    return {ev, *this};
   }
 };
 
-const std::error_category& pmem2_category() {
+auto pmem2_category() -> const std::error_category& {
   static pmem2_error_category instance;
   return instance;
 }
 
-std::error_code make_error_code(int e) {
-  return {e, pmem2_category()};
+auto make_error_code(int ev) -> std::error_code {
+  return {ev, pmem2_category()};
 }
 
 class pmem2_error : public std::system_error {
@@ -76,14 +78,15 @@ class device {
   device() = default;
   explicit device(raii::file_descriptor&& fd) : fd_(std::move(fd)) {}
   device(const device&) = delete;
-  device& operator=(const device&) = delete;
-  device(device&& device) = default;
-  device& operator=(device&& device) = default;
+  auto operator=(const device&) -> device& = delete;
+  device(device&&) = default;
+  auto operator=(device&&) -> device& = default;
+  ~device() = default;
 
   auto fd() const noexcept -> int { return fd_.get(); }
 
   auto is_devdax() const -> bool {
-    struct stat st;
+    struct stat st {};
     if (fstat(fd(), &st) < 0) {
       throw pmem2_error(errno, "pmem2::device::is_devdax failed");
     }
@@ -118,9 +121,10 @@ class source {
   source() = default;
   explicit source(raii::pmem2_source&& source) : source_(std::move(source)) {}
   source(const source&) = delete;
-  source& operator=(const source&) = delete;
-  source(source&& source) = default;
-  source& operator=(source&& source) = default;
+  auto operator=(const source&) -> source& = delete;
+  source(source&&) = default;
+  auto operator=(source&&) -> source& = default;
+  ~source() = default;
 
   auto get() const noexcept -> ::pmem2_source* { return source_.get(); }
 
@@ -148,13 +152,15 @@ class config {
   config() = default;
   explicit config(raii::pmem2_config&& config) : config_(std::move(config)) {}
   config(const config&) = delete;
-  config& operator=(const config&) = delete;
-  config(config&& config) = default;
-  config& operator=(config&& config) = default;
+  auto operator=(const config&) -> config& = delete;
+  config(config&&) = default;
+  auto operator=(config&&) -> config& = default;
+  ~config() = default;
 
   auto get() const noexcept -> ::pmem2_config* { return config_.get(); }
 
-  config& set_required_store_granularity(pmem2_granularity granularity) {
+  auto set_required_store_granularity(pmem2_granularity granularity)
+      -> config& {
     if (int ret = ::pmem2_config_set_required_store_granularity(config_.get(),
                                                                 granularity);
         ret < 0) {
@@ -182,9 +188,10 @@ class map {
   map() = default;
   explicit map(raii::pmem2_map&& map) : map_(std::move(map)) {}
   map(const map&) = delete;
-  map& operator=(const map&) = delete;
-  map(map&& map) = default;
-  map& operator=(map&& map) = default;
+  auto operator=(const map&) -> map& = delete;
+  map(map&&) = default;
+  auto operator=(map&&) -> map& = default;
+  ~map() = default;
 
   auto address() const noexcept -> void* {
     return ::pmem2_map_get_address(map_.get());
@@ -243,9 +250,10 @@ class memory_operations {
     persist_fn_ = map.get_persist_fn();
   }
   memory_operations(const memory_operations&) = default;
-  memory_operations& operator=(const memory_operations&) = default;
+  auto operator=(const memory_operations&) -> memory_operations& = default;
   memory_operations(memory_operations&&) = default;
-  memory_operations& operator=(memory_operations&&) = default;
+  auto operator=(memory_operations&&) -> memory_operations& = default;
+  ~memory_operations() = default;
 
   auto drain() const -> void { drain_fn_(); }
   auto flush(const void* ptr, size_t size) const -> void {
@@ -269,22 +277,23 @@ class memory_operations {
                  unsigned flags = 0) const -> void* {
     return memmove(pmemdest, src, len, flags | PMEM2_F_MEM_TEMPORAL);
   }
-  auto memmove_noflush(void* pmemdest, const void* src, size_t len) const -> void* {
+  auto memmove_noflush(void* pmemdest, const void* src, size_t len) const
+      -> void* {
     return memmove_t(pmemdest, src, len, PMEM2_F_MEM_NOFLUSH);
   }
-  auto memset(void* pmemdest, int c, size_t len, unsigned flags) const
+  auto memset(void* pmemdest, int val, size_t len, unsigned flags) const
       -> void* {
-    return memset_fn_(pmemdest, c, len, flags);
+    return memset_fn_(pmemdest, val, len, flags);
   }
-  auto memset_nt(void* pmemdest, int c, size_t len) const -> void* {
-    return memset(pmemdest, c, len, PMEM2_F_MEM_NONTEMPORAL);
+  auto memset_nt(void* pmemdest, int val, size_t len) const -> void* {
+    return memset(pmemdest, val, len, PMEM2_F_MEM_NONTEMPORAL);
   }
-  auto memset_t(void* pmemdest, int c, size_t len, unsigned flags) const
+  auto memset_t(void* pmemdest, int val, size_t len, unsigned flags) const
       -> void* {
-    return memset(pmemdest, c, len, flags | PMEM2_F_MEM_TEMPORAL);
+    return memset(pmemdest, val, len, flags | PMEM2_F_MEM_TEMPORAL);
   }
-  auto memset_noflush(void* pmemdest, int c, size_t len) const -> void* {
-    return memset_t(pmemdest, c, len, PMEM2_F_MEM_NOFLUSH);
+  auto memset_noflush(void* pmemdest, int val, size_t len) const -> void* {
+    return memset_t(pmemdest, val, len, PMEM2_F_MEM_NOFLUSH);
   }
   auto memcpy(void* pmemdest, const void* src, size_t len, unsigned flags) const
       -> void* {
@@ -299,7 +308,8 @@ class memory_operations {
                 unsigned flags = 0) const -> void* {
     return memcpy(pmemdest, src, len, flags | PMEM2_F_MEM_TEMPORAL);
   }
-  auto memcpy_noflush(void* pmemdest, const void* src, size_t len) const -> void* {
+  auto memcpy_noflush(void* pmemdest, const void* src, size_t len) const
+      -> void* {
     return memcpy_t(pmemdest, src, len, PMEM2_F_MEM_NOFLUSH);
   }
 };
@@ -318,11 +328,12 @@ class file_operations {
     size_ = map.size();
   }
   file_operations(const file_operations&) = default;
-  file_operations& operator=(const file_operations&) = default;
+  auto operator=(const file_operations&) -> file_operations& = default;
   file_operations(file_operations&&) = default;
-  file_operations& operator=(file_operations&&) = default;
+  auto operator=(file_operations&&) -> file_operations& = default;
+  ~file_operations() = default;
 
-  const memory_operations& mem_ops() const noexcept { return ops_; }
+  auto mem_ops() const noexcept -> const memory_operations& { return ops_; }
 
   auto address() const noexcept -> void* { return address_; }
   auto size() const noexcept -> size_t { return size_; }
@@ -339,24 +350,33 @@ class file_operations {
     ops_.persist(to_addr(ofs), size);
   }
 
-  auto pread(void* buf, size_t count, off_t ofs) const -> void {
-    ::memcpy(buf, to_addr(ofs), count);
+  auto pread(std::span<std::byte> buf, off_t ofs) const -> void {
+    std::memcpy(buf.data(), to_addr(ofs), buf.size());
   }
-  auto pwrite(const void* buf, size_t count, off_t ofs, unsigned flags) const
+
+  auto pread(size_t count, off_t ofs) const -> std::vector<std::byte> {
+    std::vector<std::byte> buf(count);
+    std::memcpy(buf.data(), to_addr(ofs), count);
+    return buf;
+  }
+
+  auto pwrite(std::span<const std::byte> buf, off_t ofs, unsigned flags) const
       -> void {
-    ops_.memcpy(to_addr(ofs), buf, count, flags);
+    ops_.memcpy(to_addr(ofs), buf.data(), buf.size(), flags);
   }
-  auto pwrite_nt(const void* buf, size_t count, off_t ofs) const -> void {
-    pwrite(buf, count, ofs, PMEM2_F_MEM_NONTEMPORAL);
+
+  auto pwrite_nt(std::span<const std::byte> buf, off_t ofs) const -> void {
+    pwrite(buf, ofs, PMEM2_F_MEM_NONTEMPORAL);
   }
-  auto pwrite_t(const void* buf,
-                size_t count,
+
+  auto pwrite_t(std::span<const std::byte> buf,
                 off_t ofs,
                 unsigned flags = 0) const -> void {
-    pwrite(buf, count, ofs, flags | PMEM2_F_MEM_TEMPORAL);
+    pwrite(buf, ofs, flags | PMEM2_F_MEM_TEMPORAL);
   }
-  auto pwrite_noflush(const void* buf, size_t count, off_t ofs) const -> void {
-    pwrite_t(buf, count, ofs, PMEM2_F_MEM_NOFLUSH);
+
+  auto pwrite_noflush(std::span<const std::byte> buf, off_t ofs) const -> void {
+    pwrite_t(buf, ofs, PMEM2_F_MEM_NOFLUSH);
   }
 };
 

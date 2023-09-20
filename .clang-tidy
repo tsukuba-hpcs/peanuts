@@ -84,8 +84,8 @@ CheckOptions:
 
 # Identifier-length
   - key: readability-identifier-length.IgnoredParameterNames
-    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os|rc'
+    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os|rc|fd|e|ec|ev'
   - key: readability-identifier-length.IgnoredVariableNames
-    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os|rc'
+    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os|rc|fd|e|ec|ev'
   - key: readability-identifier-length.IgnoredLoopCounterNames
-    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os|rc'
+    value: 't|t0|t1|p|p0|p1|i|j|k|x|X|y|Y|z|Z|ip|os|rc|fd|e|ec|ev'

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <iterator>
 #include <nlohmann/json.hpp>
+#include <span>
 #include <thread>
 #include <vector>
 
@@ -217,6 +218,17 @@ auto main(int argc, char const* argv[]) -> int try {
   bench_result["pmem_store_granularity"] = map.store_granularity();
 
   auto ops = rpmbb::pmem2::file_operations(map);
+
+  ops.pwrite_nt(std::as_bytes(std::span("test")), 0);
+  ops.pwrite_nt(std::as_bytes(std::span("hoge")), 4);
+  char buf[10];
+  ops.pread(std::as_writable_bytes(std::span{buf}), 2);
+  buf[4] = '\0';
+  if (std::string_view("stho") == buf) {
+    fmt::print("ok\n");
+  } else {
+    fmt::print("ng\n");
+  }
 
   if (parsed.count("prettify") != 0U) {
     std::cout << std::setw(4);
