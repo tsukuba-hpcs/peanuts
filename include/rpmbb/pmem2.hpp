@@ -6,11 +6,13 @@
 #include <unistd.h>
 
 #include <libpmem2.h>
+#include <cstring>
 #include <memory>
 #include <optional>
 #include <span>
 #include <string_view>
 #include <system_error>
+#include <vector>
 
 #include "raii/fd.hpp"
 #include "raii/pmem2.hpp"
