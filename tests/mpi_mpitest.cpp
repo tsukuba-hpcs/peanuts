@@ -133,8 +133,63 @@ TEST_CASE("info class: Initialize from initializer list") {
 }
 
 TEST_CASE("info class: Initializer list with duplicate keys") {
-  rpmbb::mpi::info my_info = {{"key", "value1"}, {"key", "value2"}, {"key", "value3"}};
+  rpmbb::mpi::info my_info = {
+      {"key", "value1"}, {"key", "value2"}, {"key", "value3"}};
 
   // The last value should overwrite the previous ones
   CHECK(my_info.get("key").value() == "value3");
+}
+
+TEST_CASE("aint") {
+  // Constructor from MPI_Aint
+  SUBCASE("Construct from MPI_Aint") {
+    rpmbb::mpi::aint a(42);
+    CHECK(a.native() == 42);
+  }
+
+  // Constructor from void pointer
+  SUBCASE("Construct from void pointer") {
+    int data;
+    rpmbb::mpi::aint a(&data);
+    CHECK(a.native() == rpmbb::mpi::aint::to_aint(&data));
+  }
+
+  // Test type conversion to MPI_Aint
+  SUBCASE("Type conversion to MPI_Aint") {
+    rpmbb::mpi::aint a(42);
+    MPI_Aint mpi_aint = a;
+    CHECK(mpi_aint == 42);
+  }
+
+  // Test addition operator
+  SUBCASE("Operator +") {
+    rpmbb::mpi::aint a(40);
+    rpmbb::mpi::aint b(2);
+    rpmbb::mpi::aint result = a + b;
+    CHECK(result.native() == 42);
+  }
+
+  // Test addition-assignment operator
+  SUBCASE("Operator +=") {
+    rpmbb::mpi::aint a(40);
+    rpmbb::mpi::aint b(2);
+    a += b;
+    CHECK(a.native() == 42);
+  }
+
+  // Test subtraction operator
+  SUBCASE("Operator -") {
+    rpmbb::mpi::aint a(44);
+    rpmbb::mpi::aint b(2);
+    rpmbb::mpi::aint result = a - b;
+    CHECK(result.native() == 42);
+  }
+
+  // Test subtraction-assignment operator
+  SUBCASE("Operator -=") {
+    rpmbb::mpi::aint a(44);
+    rpmbb::mpi::aint b(2);
+    a -= b;
+    CHECK(a.native() == 42);
+  }
 }

@@ -1,4 +1,5 @@
 #pragma once
+#include "rpmbb/mpi/aint.hpp"
 #include "rpmbb/mpi/comm.hpp"
 #include "rpmbb/mpi/env.hpp"
 #include "rpmbb/mpi/error.hpp"

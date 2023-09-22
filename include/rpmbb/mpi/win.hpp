@@ -4,6 +4,7 @@
 
 #include "rpmbb/mpi/comm.hpp"
 #include "rpmbb/mpi/error.hpp"
+#include "rpmbb/mpi/info.hpp"
 #include "rpmbb/mpi/raii.hpp"
 
 #include <utility>
@@ -15,11 +16,11 @@ class win {
 
  public:
   win() = default;
-  win(const comm& comm) {
+  win(const comm& comm, const info& info = MPI_INFO_NULL) {
     MPI_Win win;
     // TODO: MPI_Info
     MPI_CHECK_ERROR_CODE(
-        MPI_Win_create_dynamic(MPI_INFO_NULL, comm.native(), &win));
+        MPI_Win_create_dynamic(info.native(), comm.native(), &win));
     win_.reset(win);
   }
 

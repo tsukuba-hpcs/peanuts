@@ -13,12 +13,12 @@ class comm {
 
  public:
   static auto world() -> const comm& {
-    static comm instance{MPI_COMM_WORLD};
+    static comm instance{MPI_COMM_WORLD, false};
     return instance;
   }
 
   static auto self() -> const comm& {
-    static comm instance{MPI_COMM_SELF};
+    static comm instance{MPI_COMM_SELF, false};
     return instance;
   }
 
