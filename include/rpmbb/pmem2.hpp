@@ -144,6 +144,9 @@ class config {
       throw pmem2_error(-ret, "pmem2::config::create failed");
     }
     config_ = raii::pmem2_config(cfg_raw);
+  };
+  config(pmem2_granularity required) : config() {
+    set_required_store_granularity(required);
   }
   config(const config&) = delete;
   auto operator=(const config&) -> config& = delete;

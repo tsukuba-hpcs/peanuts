@@ -158,7 +158,8 @@ std::vector<bench_stats> aggregate_status_in_same_window(
   return result;
 }
 
-auto main(int argc, char const* argv[]) -> int try {
+auto main(int argc, char* argv[]) -> int try {
+  rpmbb::mpi::env env(&argc, &argv);
   cxxopts::Options options("rpmem_bench",
                            "MPI_Fetch_and_op + lipmem2 benchmark");
   // clang-format off
@@ -208,8 +209,7 @@ auto main(int argc, char const* argv[]) -> int try {
     device.truncate(block_size * nsegments);
   }
   auto source = rpmbb::pmem2::source{device};
-  auto config = rpmbb::pmem2::config{};
-  config.set_required_store_granularity(PMEM2_GRANULARITY_PAGE);
+  auto config = rpmbb::pmem2::config{PMEM2_GRANULARITY_PAGE};
   auto map = rpmbb::pmem2::map{source, config};
 
   auto* pmem_addr = static_cast<char*>(map.address());
@@ -219,16 +219,16 @@ auto main(int argc, char const* argv[]) -> int try {
 
   auto ops = rpmbb::pmem2::file_operations(map);
 
-  ops.pwrite_nt(std::as_bytes(std::span("test")), 0);
-  ops.pwrite_nt(std::as_bytes(std::span("hoge")), 4);
-  char buf[10];
-  ops.pread(std::as_writable_bytes(std::span{buf}), 2);
-  buf[4] = '\0';
-  if (std::string_view("stho") == buf) {
-    fmt::print("ok\n");
-  } else {
-    fmt::print("ng\n");
-  }
+  // ops.pwrite_nt(std::as_bytes(std::span("test")), 0);
+  // ops.pwrite_nt(std::as_bytes(std::span("hoge")), 4);
+  // char buf[10];
+  // ops.pread(std::as_writable_bytes(std::span(buf, 4)), 2);
+  // buf[4] = '\0';
+  // if (std::string_view("stho") == buf) {
+  //   fmt::print("ok\n");
+  // } else {
+  //   fmt::print("ng\n");
+  // }
 
   if (parsed.count("prettify") != 0U) {
     std::cout << std::setw(4);
@@ -236,6 +236,9 @@ auto main(int argc, char const* argv[]) -> int try {
   std::cout << bench_result << std::endl;
 
   return 0;
+} catch (const rpmbb::mpi::mpi_error& e) {
+  fmt::print(stderr, "mpi_error: {}\n", e.what());
+  return 1;
 } catch (const rpmbb::pmem2::pmem2_error& e) {
   fmt::print(stderr, "pmem2_error: {}\n", e.what());
   return 1;
