@@ -4,11 +4,13 @@
 #include "doctest/extensions/doctest_mpi.h"
 
 #include "rpmbb.hpp"
+#include "rpmbb/inspector/mpi.hpp"
 using namespace rpmbb;
 
 #include <mpi.h>
 #include <mutex>
 #include <thread>
+#include <span>
 
 int main(int argc, char** argv) {
   // MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, nullptr);
@@ -60,14 +62,24 @@ TEST_CASE("comm_world") {
 }
 
 TEST_CASE("win") {
-  mpi::win win{rpmbb::mpi::comm::world()};
+  const auto& comm = mpi::comm::world();
+  mpi::win win{comm};
   win.lock_all(MPI_MODE_NOCHECK);
   win.unlock_all();
-  mpi::window_lock_all_adapter adapter{win, MPI_MODE_NOCHECK};
+  mpi::win_lock_all_adapter adapter{win, MPI_MODE_NOCHECK};
   std::unique_lock lock{adapter};
 
   CHECK((win.is_separate_memory_model() || win.is_unified_memory_model()) ==
         true);
+  
+  win.set_name("test");
+  CHECK(win.get_name() == "test");
+
+  auto info = win.get_info();
+  MESSAGE(rpmbb::util::to_string(info));
+  
+  char buf[4096];
+  win.attach(std::as_writable_bytes(std::span(buf)));
 }
 
 TEST_CASE("info") {
@@ -75,6 +87,7 @@ TEST_CASE("info") {
   CHECK(info != mpi::info{MPI_INFO_NULL});
   mpi::info info_null{MPI_INFO_NULL};
   CHECK(info_null == MPI_INFO_NULL);
+  CHECK(info_null == mpi::info::null());
 }
 
 TEST_CASE("info: set and get") {
@@ -139,6 +152,22 @@ TEST_CASE("info class: Initializer list with duplicate keys") {
   // The last value should overwrite the previous ones
   CHECK(my_info.get("key").value() == "value3");
 }
+
+TEST_CASE("info iterator") {
+  using rpmbb::mpi::info;
+  using map_type = info::map_type;
+
+  map_type expected_map = {{"key1", "value1"}, {"key2", "value2"}};
+  info info_obj(expected_map);
+
+  map_type observed_map;
+  for (const auto& [key, value] : info_obj) {
+    observed_map[key] = value;
+  }
+
+  REQUIRE(expected_map == observed_map);
+}
+
 
 TEST_CASE("aint") {
   // Constructor from MPI_Aint

@@ -7,6 +7,8 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <memory>
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include <span>
 #include <thread>
@@ -159,6 +161,7 @@ std::vector<bench_stats> aggregate_status_in_same_window(
 }
 
 auto main(int argc, char* argv[]) -> int try {
+  using namespace rpmbb;
   rpmbb::mpi::env env(&argc, &argv);
   cxxopts::Options options("rpmem_bench",
                            "MPI_Fetch_and_op + lipmem2 benchmark");
@@ -218,6 +221,11 @@ auto main(int argc, char* argv[]) -> int try {
   bench_result["pmem_store_granularity"] = map.store_granularity();
 
   auto ops = rpmbb::pmem2::file_operations(map);
+
+  const auto& comm = rpmbb::mpi::comm::world();
+  auto win = mpi::win{comm};
+  auto adapter = mpi::win_lock_all_adapter{win, MPI_MODE_NOCHECK};
+  auto lock = std::unique_lock{adapter};
 
   // ops.pwrite_nt(std::as_bytes(std::span("test")), 0);
   // ops.pwrite_nt(std::as_bytes(std::span("hoge")), 4);

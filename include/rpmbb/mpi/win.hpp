@@ -2,11 +2,14 @@
 
 #include <mpi.h>
 
+#include "rpmbb/mpi/aint.hpp"
 #include "rpmbb/mpi/comm.hpp"
 #include "rpmbb/mpi/error.hpp"
 #include "rpmbb/mpi/info.hpp"
 #include "rpmbb/mpi/raii.hpp"
 
+#include <span>
+#include <string>
 #include <utility>
 
 namespace rpmbb::mpi {
@@ -87,20 +90,49 @@ class win {
   auto is_separate_memory_model() const -> bool {
     return get_memory_model() == MPI_WIN_SEPARATE;
   }
+
+  auto get_name() const -> std::string {
+    int len{0};
+    std::string result(MPI_MAX_OBJECT_NAME, '\0');
+    MPI_CHECK_ERROR_CODE(MPI_Win_get_name(native(), &result[0], &len));
+    result.resize(static_cast<size_t>(len));
+    return result;
+  }
+
+  auto set_name(const std::string& name) const -> void {
+    MPI_CHECK_ERROR_CODE(MPI_Win_set_name(native(), name.c_str()));
+  }
+
+  auto get_info() const -> info {
+    MPI_Info info;
+    MPI_CHECK_ERROR_CODE(MPI_Win_get_info(native(), &info));
+    return info;
+  }
+
+  auto set_info(const info& info) const -> void {
+    MPI_CHECK_ERROR_CODE(MPI_Win_set_info(native(), info));
+  }
+
+  auto attach(void* base, aint size) const -> void {
+    MPI_CHECK_ERROR_CODE(MPI_Win_attach(native(), base, size));
+  }
+
+  auto attach(std::span<std::byte> buf) const -> void {
+    attach(buf.data(), buf.size());
+  }
 };
 
-class window_lock_all_adapter {
+class win_lock_all_adapter {
  public:
-  window_lock_all_adapter() = default;
-  window_lock_all_adapter(const window_lock_all_adapter&) = default;
-  auto operator=(const window_lock_all_adapter&)
-      -> window_lock_all_adapter& = default;
-  window_lock_all_adapter(window_lock_all_adapter&&) = default;
-  auto operator=(window_lock_all_adapter&&)
-      -> window_lock_all_adapter& = default;
-  ~window_lock_all_adapter() = default;
+  win_lock_all_adapter() = default;
+  win_lock_all_adapter(const win_lock_all_adapter&) = default;
+  auto operator=(const win_lock_all_adapter&)
+      -> win_lock_all_adapter& = default;
+  win_lock_all_adapter(win_lock_all_adapter&&) = default;
+  auto operator=(win_lock_all_adapter&&) -> win_lock_all_adapter& = default;
+  ~win_lock_all_adapter() = default;
 
-  explicit window_lock_all_adapter(const win& win, int mode = 0)
+  explicit win_lock_all_adapter(const win& win, int mode = 0)
       : win_(&win), mode_(mode) {}
 
   void lock() { win_->lock_all(mode_); }
