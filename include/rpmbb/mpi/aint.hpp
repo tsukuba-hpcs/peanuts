@@ -7,6 +7,8 @@
 namespace rpmbb::mpi {
 class aint {
  public:
+  static auto bottom() -> aint { return aint{MPI_BOTTOM}; }
+
   aint() = default;
   aint(MPI_Aint addr) : addr_(addr) {}
   template <typename T = void>
