@@ -18,12 +18,12 @@ class win {
   win() = default;
   win(const comm& comm, const info& info = MPI_INFO_NULL) {
     MPI_Win win;
-    // TODO: MPI_Info
     MPI_CHECK_ERROR_CODE(
         MPI_Win_create_dynamic(info.native(), comm.native(), &win));
     win_.reset(win);
   }
 
+  operator MPI_Win() const { return native(); }
   auto native() const -> MPI_Win { return win_.get().native; }
 
   auto lock_all(int mode = 0) const -> void {

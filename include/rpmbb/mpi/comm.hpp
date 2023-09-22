@@ -27,6 +27,7 @@ class comm {
   explicit comm(const MPI_Comm native, const bool managed = false)
       : comm_(native), managed_comm_(managed ? native : MPI_COMM_NULL) {}
 
+  operator MPI_Comm() const { return native(); }
   auto native() const -> MPI_Comm { return comm_; }
 
   int rank() const {
