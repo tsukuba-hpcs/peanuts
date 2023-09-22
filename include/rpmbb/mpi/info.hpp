@@ -18,6 +18,8 @@ class info {
   static constexpr size_t max_value_length = MPI_MAX_INFO_VAL;
   using map_type = std::unordered_map<std::string, std::string>;
 
+  static auto null() -> info { return info{MPI_INFO_NULL}; }
+
  public:
   info() {
     MPI_Info info;
@@ -46,7 +48,16 @@ class info {
   }
   auto operator!=(const info& other) const -> bool { return !(*this == other); }
 
+  friend bool operator==(const info& lhs, MPI_Info rhs) {
+    return lhs.native() == rhs;
+  }
+
+  friend bool operator==(MPI_Info lhs, const info& rhs) {
+    return lhs == rhs.native();
+  }
+
   auto native() const -> MPI_Info { return info_.get().native; }
+  operator MPI_Info() const { return native(); }
 
   auto duplicate() const -> info {
     MPI_Info new_info;
@@ -99,6 +110,62 @@ class info {
   auto operator[](const std::string& key) const -> std::optional<std::string> {
     return get(key);
   }
+
+ public:
+  class iterator {
+   public:
+    iterator(info* info, int index) : info_(info), index_(index) {}
+
+    std::pair<std::string, std::string> operator*() {
+      auto key = info_->get_nthkey(index_);
+      auto value = info_->get(key);
+      assert(value.has_value());
+      return {key, *value};
+    }
+
+    iterator& operator++() {
+      ++index_;
+      return *this;
+    }
+
+    bool operator!=(const iterator& other) const {
+      return index_ != other.index_;
+    }
+
+   private:
+    info* info_;
+    int index_;
+  };
+
+  class const_iterator {
+   public:
+    const_iterator(const info* info, int index) : info_(info), index_(index) {}
+
+    std::pair<std::string, std::string> operator*() const {
+      auto key = info_->get_nthkey(index_);
+      auto value = info_->get(key);
+      assert(value.has_value());
+      return {key, *value};
+    }
+
+    const_iterator& operator++() {
+      ++index_;
+      return *this;
+    }
+
+    bool operator!=(const const_iterator& other) const {
+      return index_ != other.index_;
+    }
+
+   private:
+    const info* info_;
+    int index_;
+  };
+
+  iterator begin() { return iterator(this, 0); }
+  iterator end() { return iterator(this, get_nkeys()); }
+  const_iterator begin() const { return const_iterator(this, 0); }
+  const_iterator end() const { return const_iterator(this, get_nkeys()); }
 };
 
 }  // namespace rpmbb::mpi
