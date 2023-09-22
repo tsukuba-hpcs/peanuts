@@ -203,14 +203,14 @@ auto main(int argc, char const* argv[]) -> int try {
       {"nsegments", nsegments},
   };
 
-  auto device = rpmbb::pmem2::device::open(parsed["path"].as<std::string>());
+  auto device = rpmbb::pmem2::device{parsed["path"].as<std::string>()};
   if (!device.is_devdax()) {
     device.truncate(block_size * nsegments);
   }
-  auto source = rpmbb::pmem2::source::from_device(device);
-  auto config = rpmbb::pmem2::config::create();
+  auto source = rpmbb::pmem2::source{device};
+  auto config = rpmbb::pmem2::config{};
   config.set_required_store_granularity(PMEM2_GRANULARITY_PAGE);
-  auto map = rpmbb::pmem2::map::create(source, config);
+  auto map = rpmbb::pmem2::map{source, config};
 
   auto* pmem_addr = static_cast<char*>(map.address());
   bench_result["pmem_addr"] = fmt::format("{}", fmt::ptr(pmem_addr));

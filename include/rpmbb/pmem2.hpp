@@ -64,21 +64,17 @@ class device {
   raii::file_descriptor fd_{};
 
  public:
-  static auto open(std::string_view path, bool create_if_does_not_exist = true)
-      -> device {
-    auto fd = raii::file_descriptor(::open(path.data(), O_RDWR));
-    if (!fd && create_if_does_not_exist) {
-      fd = raii::file_descriptor(
+  device() = default;
+  explicit device(std::string_view path, bool create_if_does_not_exist = true) {
+    fd_ = raii::file_descriptor(::open(path.data(), O_RDWR));
+    if (!fd_ && create_if_does_not_exist) {
+      fd_ = raii::file_descriptor(
           ::open(path.data(), O_RDWR | O_CREAT | O_EXCL | O_TRUNC, 0600));
-      if (!fd) {
+      if (!fd_) {
         throw pmem2_error(errno, "pmem2::device::open failed");
       }
     }
-    return device(std::move(fd));
   }
-
-  device() = default;
-  explicit device(raii::file_descriptor&& fd) : fd_(std::move(fd)) {}
   device(const device&) = delete;
   auto operator=(const device&) -> device& = delete;
   device(device&&) = default;
@@ -101,8 +97,8 @@ class device {
     }
   }
 
-  auto close() const -> void {
-    if (::close(fd()) < 0) {
+  auto close() -> void {
+    if (::close(fd_.release()) < 0) {
       throw pmem2_error(errno, "pmem2::device::close failed");
     }
   }
@@ -112,16 +108,14 @@ class source {
   raii::pmem2_source source_{};
 
  public:
-  static auto from_device(const device& device) -> source {
+  source() = default;
+  explicit source(const device& device) {
     ::pmem2_source* src = nullptr;
     if (int ret = ::pmem2_source_from_fd(&src, device.fd()); ret < 0) {
       throw pmem2_error(-ret, "pmem2::device::from_device failed");
     }
-    return source(raii::pmem2_source(src));
+    source_ = raii::pmem2_source(src);
   }
-
-  source() = default;
-  explicit source(raii::pmem2_source&& source) : source_(std::move(source)) {}
   source(const source&) = delete;
   auto operator=(const source&) -> source& = delete;
   source(source&&) = default;
@@ -144,15 +138,13 @@ class config {
   raii::pmem2_config config_{};
 
  public:
-  static auto create() -> config {
+  config() {
     ::pmem2_config* cfg_raw = nullptr;
     if (int ret = ::pmem2_config_new(&cfg_raw); ret < 0) {
       throw pmem2_error(-ret, "pmem2::config::create failed");
     }
-    return config{raii::pmem2_config(cfg_raw)};
+    config_ = raii::pmem2_config(cfg_raw);
   }
-  config() = default;
-  explicit config(raii::pmem2_config&& config) : config_(std::move(config)) {}
   config(const config&) = delete;
   auto operator=(const config&) -> config& = delete;
   config(config&&) = default;
@@ -178,17 +170,15 @@ class map {
   raii::pmem2_map map_{};
 
  public:
-  static auto create(const source& source, const config& config) -> map {
+  map() = default;
+  map(const source& source, const config& config) {
     ::pmem2_map* map_raw = nullptr;
     if (int ret = ::pmem2_map_new(&map_raw, config.get(), source.get());
         ret < 0) {
       throw pmem2_error(-ret, "pmem2::map::create failed");
     }
-    return map{raii::pmem2_map(map_raw)};
+    map_ = raii::pmem2_map(map_raw);
   }
-
-  map() = default;
-  explicit map(raii::pmem2_map&& map) : map_(std::move(map)) {}
   map(const map&) = delete;
   auto operator=(const map&) -> map& = delete;
   map(map&&) = default;
