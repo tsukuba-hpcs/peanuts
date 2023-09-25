@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "rpmbb/mpi/error.hpp"
+#include "rpmbb/util/cond_deleter.hpp"
 
 namespace rpmbb::mpi::raii {
 namespace detail {
@@ -25,29 +26,40 @@ using bool_handle = native_handle<bool, false>;
 
 struct env_deleter {
   using pointer = bool_handle;
-  void operator()(pointer) { MPI_Finalize(); }
+  void operator()(pointer) const { MPI_Finalize(); }
 };
 
 struct comm_deleter {
   using pointer = native_handle<MPI_Comm, MPI_COMM_NULL>;
-  void operator()(pointer comm) { MPI_Comm_free(&comm.native); }
+  void operator()(pointer comm) const { MPI_Comm_free(&comm.native); }
 };
 
 struct win_deleter {
   using pointer = native_handle<MPI_Win, MPI_WIN_NULL>;
-  void operator()(pointer win) { MPI_Win_free(&win.native); }
+  void operator()(pointer win) const { MPI_Win_free(&win.native); }
 };
 
 struct info_deleter {
   using pointer = native_handle<MPI_Info, MPI_INFO_NULL>;
-  void operator()(pointer info) { MPI_Info_free(&info.native); }
+  void operator()(pointer info) const { MPI_Info_free(&info.native); }
+};
+
+struct datatype_deleter {
+  using pointer = native_handle<MPI_Datatype, MPI_DATATYPE_NULL>;
+  void operator()(pointer datatype) const { MPI_Type_free(&datatype.native); }
 };
 
 }  // namespace detail
 
-using unique_env = std::unique_ptr<void, detail::env_deleter>;
-using unique_comm = std::unique_ptr<void, detail::comm_deleter>;
-using unique_win = std::unique_ptr<void, detail::win_deleter>;
-using unique_info = std::unique_ptr<void, detail::info_deleter>;
+using unique_env =
+    std::unique_ptr<void, util::cond_deleter<detail::env_deleter>>;
+using unique_comm =
+    std::unique_ptr<void, util::cond_deleter<detail::comm_deleter>>;
+using unique_win =
+    std::unique_ptr<void, util::cond_deleter<detail::win_deleter>>;
+using unique_info =
+    std::unique_ptr<void, util::cond_deleter<detail::info_deleter>>;
+using unique_datatype =
+    std::unique_ptr<void, util::cond_deleter<detail::datatype_deleter>>;
 
 }  // namespace rpmbb::mpi::raii
