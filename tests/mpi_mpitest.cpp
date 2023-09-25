@@ -1,4 +1,4 @@
-#define DOCTEST_CONFIG_IMPLEMENT
+t #define DOCTEST_CONFIG_IMPLEMENT
 // #define DOCTEST_CONFIG_NO_SHORT_MACRO_NAMES
 // #include "doctest/doctest.h"
 #include "doctest/extensions/doctest_mpi.h"
@@ -9,8 +9,8 @@ using namespace rpmbb;
 
 #include <mpi.h>
 #include <mutex>
-#include <thread>
 #include <span>
+#include <thread>
 
 int main(int argc, char** argv) {
   // MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, nullptr);
@@ -55,10 +55,32 @@ TEST_CASE("mpi::env") {
   CHECK(rpmbb::mpi::env::processor_name().size() > 0);
 }
 
-TEST_CASE("comm_world") {
+TEST_CASE("comm") {
   const auto& comm = rpmbb::mpi::comm::world();
   CHECK(comm.size() == doctest::mpi_comm_world_size());
-  MESSAGE(comm.rank());
+
+  SUBCASE("all_gather") {
+    const std::vector<int> send_data{1, 2, 3};
+    std::vector<int> recv_data(send_data.size() * comm.size());
+
+    comm.all_gather(std::span{send_data}, std::span{recv_data});
+
+    for (auto [i, v] : util::enumerate(recv_data)) {
+      CHECK(v == i % 3 + 1);
+    }
+  }
+
+  SUBCASE("all_gather byte") {
+    const std::vector<int> send_data{1, 2, 3};
+    std::vector<int> recv_data(send_data.size() * comm.size());
+
+    comm.all_gather(std::as_bytes(std::span{send_data}),
+                    std::as_writable_bytes(std::span{recv_data}));
+
+    for (auto [i, v] : util::enumerate(recv_data)) {
+      CHECK(v == i % 3 + 1);
+    }
+  }
 }
 
 TEST_CASE("win") {
@@ -71,13 +93,13 @@ TEST_CASE("win") {
 
   CHECK((win.is_separate_memory_model() || win.is_unified_memory_model()) ==
         true);
-  
+
   win.set_name("test");
   CHECK(win.get_name() == "test");
 
   auto info = win.get_info();
   MESSAGE(rpmbb::util::to_string(info));
-  
+
   char buf[4096];
   win.attach(std::as_writable_bytes(std::span(buf)));
 }
@@ -167,7 +189,6 @@ TEST_CASE("info iterator") {
 
   REQUIRE(expected_map == observed_map);
 }
-
 
 TEST_CASE("aint") {
   // Constructor from MPI_Aint

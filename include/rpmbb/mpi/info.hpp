@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rpmbb/mpi/error.hpp"
+#include "rpmbb/mpi/raii.hpp"
 
 #include <mpi.h>
 
@@ -18,7 +19,10 @@ class info {
   static constexpr size_t max_value_length = MPI_MAX_INFO_VAL;
   using map_type = std::unordered_map<std::string, std::string>;
 
-  static auto null() -> info { return info{MPI_INFO_NULL}; }
+  static auto null() -> const info& {
+    static info instance{MPI_INFO_NULL};
+    return instance;
+  }
 
  public:
   info() {
