@@ -196,6 +196,10 @@ class map {
     return ::pmem2_map_get_size(map_.get());
   }
 
+  auto as_span() const noexcept -> std::span<std::byte> {
+    return {static_cast<std::byte*>(address()), size()};
+  }
+
   auto store_granularity() const noexcept -> pmem2_granularity {
     return ::pmem2_map_get_store_granularity(map_.get());
   }
