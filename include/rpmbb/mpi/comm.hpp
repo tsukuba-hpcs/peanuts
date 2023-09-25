@@ -62,30 +62,26 @@ class comm {
     return result;
   }
 
-  template <typename T>
+  template <typename T, typename U>
   void all_gather(std::span<const T> send_data,
-                  std::span<T> recv_data,
-                  const datatype& dtype) const {
+                  const datatype& send_dtype,
+                  std::span<U> recv_data,
+                  const datatype& recv_dtype) const {
     MPI_CHECK_ERROR_CODE(MPI_Allgather(
-        send_data.data(), static_cast<int>(send_data.size()), dtype,
-        recv_data.data(), static_cast<int>(send_data.size()), dtype, native()));
+        send_data.data(), static_cast<int>(send_data.size()), send_dtype,
+        recv_data.data(), static_cast<int>(recv_data.size()) / size(),
+        recv_dtype, native()));
   }
 
-  template <typename T>
-  void all_gather(std::span<const T> send_data, std::span<T> recv_data) const {
-    all_gather(send_data, recv_data, datatype::basic<std::remove_cv_t<T>>());
+  template <typename T, typename U>
+  void all_gather(std::span<const T> send_data, std::span<U> recv_data) const {
+    all_gather(send_data, datatype::basic<std::remove_cv_t<T>>(), recv_data,
+               datatype::basic<std::remove_cv_t<U>>());
   }
 
-  template <typename T>
-  void all_gather(const T& send_data, std::span<T> recv_data) const {
+  template <typename T, typename U>
+  void all_gather(const T& send_data, std::span<U> recv_data) const {
     all_gather(std::span<const T>(&send_data, 1), recv_data);
-  }
-
-  template <typename T>
-  void all_gather(const T& send_data,
-                  std::span<T> recv_data,
-                  const datatype& dtype) const {
-    all_gather(std::span<const T>(&send_data, 1), recv_data, dtype);
   }
 };
 

@@ -10,10 +10,10 @@
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include <ostream>
 #include <span>
 #include <thread>
 #include <vector>
-
 #include "rpmbb.hpp"
 #include "rpmbb/inspector/std.hpp"
 
@@ -174,7 +174,6 @@ auto main(int argc, char* argv[]) -> int try {
     ("p,path", "path to pmem device", cxxopts::value<std::string>()->default_value("/dev/dax0.0"))
     ("t,transfer", "transfer size", cxxopts::value<size_t>()->default_value("256"))
     ("b,block", "block size - contiguous bytes to write per task", cxxopts::value<size_t>()->default_value("1073741824"))
-    ("s,segment", "number of segments", cxxopts::value<size_t>()->default_value("1"))
   ;
   // clang-format on
 
@@ -195,7 +194,6 @@ auto main(int argc, char* argv[]) -> int try {
   // const auto window_cycles = rpmbb::util::tsc::cycles_per_msec() * window;
   const auto transfer_size = parsed["transfer"].as<size_t>();
   const auto block_size = parsed["block"].as<size_t>();
-  const auto nsegments = parsed["segment"].as<size_t>();
 
   ordered_json bench_result = {
       {"version", RPMBB_VERSION},
@@ -204,12 +202,36 @@ auto main(int argc, char* argv[]) -> int try {
       {"window", window},
       {"transfer_size", transfer_size},
       {"block_size", block_size},
-      {"nsegments", nsegments},
   };
+
+  assert(block_size % transfer_size == 0);
+
+  const auto& comm = rpmbb::mpi::comm::world();
+  auto intra_comm = mpi::comm{comm, mpi::split_type::shared};
+  auto inter_comm = mpi::comm{comm, intra_comm.rank()};
+
+  struct process_map_entry {
+    int intra_rank;
+    int inter_rank;
+    std::ostream& inspect(std::ostream& os) const {
+      os << "{intra_rank:" << intra_rank << ",inter_rank:" << inter_rank << "}";
+      return os;
+    }
+  };
+  std::vector<process_map_entry> process_map(comm.size());
+  {
+    // const auto entry = process_map_entry{intra_comm.rank(), inter_comm.rank()};
+    // comm.all_gather(std::as_bytes(std::span{&entry, 1}),
+    //                 std::as_writable_bytes(std::span{process_map}));
+    comm.all_gather(process_map_entry{intra_comm.rank(), inter_comm.rank()},
+                    std::as_writable_bytes(std::span{process_map}));
+  }
+
+  std::cout << rpmbb::util::make_inspector(process_map) << std::endl;
 
   auto device = rpmbb::pmem2::device{parsed["path"].as<std::string>()};
   if (!device.is_devdax()) {
-    device.truncate(block_size * nsegments);
+    device.truncate(block_size * intra_comm.size());
   }
   auto source = rpmbb::pmem2::source{device};
   auto config = rpmbb::pmem2::config{PMEM2_GRANULARITY_PAGE};
@@ -222,10 +244,21 @@ auto main(int argc, char* argv[]) -> int try {
 
   auto ops = rpmbb::pmem2::file_operations(map);
 
-  const auto& comm = rpmbb::mpi::comm::world();
   auto win = mpi::win{comm};
+  win.attach(map.as_span());
   auto adapter = mpi::win_lock_all_adapter{win, MPI_MODE_NOCHECK};
   auto lock = std::unique_lock{adapter};
+
+  const auto xfer_buffer =
+      util::generate_random_alphanumeric_string(transfer_size);
+
+  // write
+  auto disp = intra_comm.rank() * block_size;
+  for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
+    ops.pwrite_nt(std::as_bytes(std::span(xfer_buffer)), disp + ofs);
+  }
+
+  // read neighbor's data
 
   // ops.pwrite_nt(std::as_bytes(std::span("test")), 0);
   // ops.pwrite_nt(std::as_bytes(std::span("hoge")), 4);

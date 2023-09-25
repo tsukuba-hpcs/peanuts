@@ -1,4 +1,4 @@
-t #define DOCTEST_CONFIG_IMPLEMENT
+#define DOCTEST_CONFIG_IMPLEMENT
 // #define DOCTEST_CONFIG_NO_SHORT_MACRO_NAMES
 // #include "doctest/doctest.h"
 #include "doctest/extensions/doctest_mpi.h"
