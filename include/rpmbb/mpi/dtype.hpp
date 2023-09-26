@@ -14,8 +14,7 @@ class dtype {
   raii::unique_dtype dtype_{MPI_DATATYPE_NULL, false};
 
  public:
-  dtype(const MPI_Datatype native, bool managed)
-      : dtype_(native, managed) {}
+  dtype(const MPI_Datatype native, bool managed) : dtype_(native, managed) {}
   explicit dtype(const dtype& base, const int count) {
     MPI_Datatype new_dtype;
     MPI_CHECK_ERROR_CODE(MPI_Type_contiguous(count, base, &new_dtype));
@@ -55,20 +54,17 @@ class dtype {
   }
 
   auto is_basic() const -> bool {
-    auto [num_integers, num_addresses, num_dtypes, combiner] =
-        get_envelope();
+    auto [num_integers, num_addresses, num_dtypes, combiner] = get_envelope();
     return num_integers == 0 && num_addresses == 0 && num_dtypes == 0 &&
            combiner == MPI_COMBINER_NAMED;
   }
 };
 
 template <typename T>
-struct dtype_converter {
-  static dtype to_dtype();
-};
-
-template <typename T>
-inline dtype to_dtype();
+inline dtype to_dtype() {
+  static_assert(std::is_same_v<T, void>, "Unsupported type");
+  return {MPI_DATATYPE_NULL, false};
+}
 
 // clang-format off
 template <> inline dtype to_dtype<int>()                { return {MPI_INT, false}; }
@@ -88,25 +84,5 @@ template <> inline dtype to_dtype<bool>()               { return {MPI_CXX_BOOL, 
 template <> inline dtype to_dtype<std::byte>()          { return {MPI_BYTE, false}; }
 template <> inline dtype to_dtype<void*>()              { return to_dtype<uintptr_t>(); }
 // clang-format on
-
-namespace detail {
-
-template <typename T, typename = void>
-struct has_func_to_dtype : std::false_type {};
-
-template <typename T>
-struct has_func_to_dtype<T, std::void_t<decltype(to_dtype<T>())>>
-    : std::true_type {};
-
-template <typename T>
-constexpr auto select_to_dtype() -> dtype {
-  if constexpr (has_func_to_dtype<T>::value) {
-    return to_dtype<T>();
-  } else {
-    return dtype_converter<T>::to_dtype();
-  }
-}
-
-}  // namespace detail
 
 }  // namespace rpmbb::mpi
