@@ -75,8 +75,8 @@ class comm {
 
   template <typename T, typename U>
   void all_gather(std::span<const T> send_data, std::span<U> recv_data) const {
-    all_gather(send_data, recv_data, datatype::basic<std::remove_cv_t<T>>(),
-               datatype::basic<std::remove_cv_t<U>>());
+    all_gather(send_data, recv_data, to_datatype<std::remove_cv_t<T>>(),
+               to_datatype<std::remove_cv_t<U>>());
   }
 
   template <typename T, typename U>

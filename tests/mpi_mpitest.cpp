@@ -243,3 +243,12 @@ TEST_CASE("aint") {
     CHECK(a.native() == 42);
   }
 }
+
+TEST_CASE("mpi") {
+  SUBCASE("is_basic") {
+    const auto& int_datatype = mpi::datatype{MPI_INT, false};
+    CHECK(int_datatype.is_basic() == true);
+    auto derived_datatype = mpi::datatype{int_datatype, 10};
+    CHECK(derived_datatype.is_basic() == false);
+  }
+}

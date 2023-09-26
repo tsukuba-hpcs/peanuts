@@ -220,7 +220,7 @@ auto main(int argc, char* argv[]) -> int try {
   };
   std::vector<process_map_entry> process_map(comm.size());
   {
-    mpi::datatype process_map_entry_datatype = mpi::datatype{mpi::datatype::basic<int>(), 2};
+    mpi::datatype process_map_entry_datatype = mpi::datatype{mpi::to_datatype<int>(), 2};
     process_map_entry_datatype.commit();
     const auto entry = process_map_entry{intra_comm.rank(), inter_comm.rank()};
     // comm.all_gather(std::as_bytes(std::span{&entry, 1}),
