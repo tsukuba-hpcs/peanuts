@@ -220,11 +220,15 @@ auto main(int argc, char* argv[]) -> int try {
   };
   std::vector<process_map_entry> process_map(comm.size());
   {
-    // const auto entry = process_map_entry{intra_comm.rank(), inter_comm.rank()};
+    mpi::datatype process_map_entry_datatype = mpi::datatype{mpi::datatype::basic<int>(), 2};
+    process_map_entry_datatype.commit();
+    const auto entry = process_map_entry{intra_comm.rank(), inter_comm.rank()};
     // comm.all_gather(std::as_bytes(std::span{&entry, 1}),
     //                 std::as_writable_bytes(std::span{process_map}));
-    comm.all_gather(process_map_entry{intra_comm.rank(), inter_comm.rank()},
-                    std::as_writable_bytes(std::span{process_map}));
+    comm.all_gather(std::span{&entry, 1}, std::span{process_map},
+                    process_map_entry_datatype, process_map_entry_datatype);
+    // comm.all_gather(process_map_entry{intra_comm.rank(), inter_comm.rank()},
+    //                 std::as_writable_bytes(std::span{process_map}));
   }
 
   std::cout << rpmbb::util::make_inspector(process_map) << std::endl;

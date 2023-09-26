@@ -64,8 +64,8 @@ class comm {
 
   template <typename T, typename U>
   void all_gather(std::span<const T> send_data,
-                  const datatype& send_dtype,
                   std::span<U> recv_data,
+                  const datatype& send_dtype,
                   const datatype& recv_dtype) const {
     MPI_CHECK_ERROR_CODE(MPI_Allgather(
         send_data.data(), static_cast<int>(send_data.size()), send_dtype,
@@ -75,7 +75,7 @@ class comm {
 
   template <typename T, typename U>
   void all_gather(std::span<const T> send_data, std::span<U> recv_data) const {
-    all_gather(send_data, datatype::basic<std::remove_cv_t<T>>(), recv_data,
+    all_gather(send_data, recv_data, datatype::basic<std::remove_cv_t<T>>(),
                datatype::basic<std::remove_cv_t<U>>());
   }
 

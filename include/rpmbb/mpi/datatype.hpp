@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rpmbb/mpi/error.hpp"
 #include "rpmbb/mpi/raii.hpp"
 
 #include <mpi.h>
@@ -7,9 +8,7 @@
 namespace rpmbb::mpi {
 
 // clang-format off
-template <typename T>
-MPI_Datatype basic_datatype();
-
+template <typename T> inline MPI_Datatype basic_datatype();
 template<> inline MPI_Datatype basic_datatype<int>()                 { return MPI_INT; }
 template<> inline MPI_Datatype basic_datatype<unsigned int>()        { return MPI_UNSIGNED; }
 template<> inline MPI_Datatype basic_datatype<long>()                { return MPI_LONG; }
@@ -23,14 +22,6 @@ template<> inline MPI_Datatype basic_datatype<unsigned char>()       { return MP
 template<> inline MPI_Datatype basic_datatype<float>()               { return MPI_FLOAT; }
 template<> inline MPI_Datatype basic_datatype<double>()              { return MPI_DOUBLE; }
 template<> inline MPI_Datatype basic_datatype<long double>()         { return MPI_LONG_DOUBLE; }
-// template<> inline MPI_Datatype basic_datatype<std::int8_t>()         { return MPI_INT8_T; }
-// template<> inline MPI_Datatype basic_datatype<std::int16_t>()        { return MPI_INT16_T; }
-// template<> inline MPI_Datatype basic_datatype<std::int32_t>()        { return MPI_INT32_T; }
-// template<> inline MPI_Datatype basic_datatype<std::int64_t>()        { return MPI_INT64_T; }
-// template<> inline MPI_Datatype basic_datatype<std::uint8_t>()        { return MPI_UINT8_T; }
-// template<> inline MPI_Datatype basic_datatype<std::uint16_t>()       { return MPI_UINT16_T; }
-// template<> inline MPI_Datatype basic_datatype<std::uint32_t>()       { return MPI_UINT32_T; }
-// template<> inline MPI_Datatype basic_datatype<std::uint64_t>()       { return MPI_UINT64_T; }
 template<> inline MPI_Datatype basic_datatype<bool>()                { return MPI_CXX_BOOL; }
 template<> inline MPI_Datatype basic_datatype<void*>()               { return basic_datatype<uintptr_t>(); }
 template<> inline MPI_Datatype basic_datatype<std::byte>()           { return MPI_BYTE; }
@@ -48,6 +39,12 @@ class datatype {
 
   explicit datatype(const MPI_Datatype native, const bool managed = true)
       : datatype_(native, managed) {}
+  explicit datatype(const datatype& base, const int count) {
+    MPI_Datatype new_dtype;
+    MPI_CHECK_ERROR_CODE(MPI_Type_contiguous(count, base, &new_dtype));
+    datatype_ = raii::unique_datatype{new_dtype, true};
+  }
+
   datatype(const datatype&) = delete;
   auto operator=(const datatype&) -> datatype& = delete;
   datatype(datatype&&) = default;
@@ -66,6 +63,12 @@ class datatype {
   }
   auto native() const -> MPI_Datatype { return datatype_.get().native; }
   operator MPI_Datatype() const { return native(); }
+
+  auto commit() -> void {
+    MPI_Datatype dtype = native();
+    MPI_CHECK_ERROR_CODE(MPI_Type_commit(&dtype));
+    assert(dtype == native());
+  }
 };
 
 }  // namespace rpmbb::mpi
