@@ -44,9 +44,9 @@ struct info_deleter {
   void operator()(pointer info) const { MPI_Info_free(&info.native); }
 };
 
-struct datatype_deleter {
+struct dtype_deleter {
   using pointer = native_handle<MPI_Datatype, MPI_DATATYPE_NULL>;
-  void operator()(pointer datatype) const { MPI_Type_free(&datatype.native); }
+  void operator()(pointer dtype) const { MPI_Type_free(&dtype.native); }
 };
 
 }  // namespace detail
@@ -56,7 +56,7 @@ using unique_comm =
     std::unique_ptr<void, util::cond_deleter<detail::comm_deleter>>;
 using unique_win = std::unique_ptr<void, detail::win_deleter>;
 using unique_info = std::unique_ptr<void, detail::info_deleter>;
-using unique_datatype =
-    std::unique_ptr<void, util::cond_deleter<detail::datatype_deleter>>;
+using unique_dtype =
+    std::unique_ptr<void, util::cond_deleter<detail::dtype_deleter>>;
 
 }  // namespace rpmbb::mpi::raii

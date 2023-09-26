@@ -2,7 +2,7 @@
 
 #include <mpi.h>
 
-#include "rpmbb/mpi/datatype.hpp"
+#include "rpmbb/mpi/dtype.hpp"
 #include "rpmbb/mpi/error.hpp"
 #include "rpmbb/mpi/info.hpp"
 #include "rpmbb/mpi/raii.hpp"
@@ -65,8 +65,8 @@ class comm {
   template <typename T, typename U>
   void all_gather(std::span<const T> send_data,
                   std::span<U> recv_data,
-                  const datatype& send_dtype,
-                  const datatype& recv_dtype) const {
+                  const dtype& send_dtype,
+                  const dtype& recv_dtype) const {
     MPI_CHECK_ERROR_CODE(MPI_Allgather(
         send_data.data(), static_cast<int>(send_data.size()), send_dtype,
         recv_data.data(), static_cast<int>(recv_data.size()) / size(),
@@ -75,8 +75,8 @@ class comm {
 
   template <typename T, typename U>
   void all_gather(std::span<const T> send_data, std::span<U> recv_data) const {
-    all_gather(send_data, recv_data, to_datatype<std::remove_cv_t<T>>(),
-               to_datatype<std::remove_cv_t<U>>());
+    all_gather(send_data, recv_data, to_dtype<std::remove_cv_t<T>>(),
+               to_dtype<std::remove_cv_t<U>>());
   }
 
   template <typename T, typename U>

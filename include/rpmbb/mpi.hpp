@@ -1,6 +1,7 @@
 #pragma once
 #include "rpmbb/mpi/aint.hpp"
 #include "rpmbb/mpi/comm.hpp"
+#include "rpmbb/mpi/dtype.hpp"
 #include "rpmbb/mpi/env.hpp"
 #include "rpmbb/mpi/error.hpp"
 #include "rpmbb/mpi/info.hpp"
