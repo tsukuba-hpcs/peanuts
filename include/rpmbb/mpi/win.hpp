@@ -4,9 +4,12 @@
 
 #include "rpmbb/mpi/aint.hpp"
 #include "rpmbb/mpi/comm.hpp"
+#include "rpmbb/mpi/detail/container_adapter.hpp"
+#include "rpmbb/mpi/dtype.hpp"
 #include "rpmbb/mpi/error.hpp"
 #include "rpmbb/mpi/info.hpp"
 #include "rpmbb/mpi/raii.hpp"
+#include "rpmbb/mpi/type_traits.hpp"
 
 #include <span>
 #include <string>
@@ -21,8 +24,7 @@ class win {
   win() = default;
   win(const comm& comm, const info& info = MPI_INFO_NULL) {
     MPI_Win win;
-    MPI_CHECK_ERROR_CODE(
-        MPI_Win_create_dynamic(info, comm, &win));
+    MPI_CHECK_ERROR_CODE(MPI_Win_create_dynamic(info, comm, &win));
     win_.reset(win);
   }
 
@@ -120,6 +122,50 @@ class win {
   auto attach(std::span<std::byte> buf) const -> void {
     attach(buf.data(), buf.size());
   }
+
+  auto detach(void* base) const -> void {
+    MPI_CHECK_ERROR_CODE(MPI_Win_detach(native(), base));
+  }
+
+  auto detach(std::span<std::byte> buf) const -> void { detach(buf.data()); }
+
+  template <typename T>
+  auto get(std::span<T> recv_buf,
+           const dtype& recv_dtype,
+           int target_rank,
+           aint target_disp,
+           int target_count,
+           const dtype& target_dtype) const -> void {
+    MPI_CHECK_ERROR_CODE(MPI_Get(
+        recv_buf.data(), static_cast<int>(recv_buf.size()), recv_dtype,
+        target_rank, target_disp, target_count, target_dtype, native()));
+  }
+
+  template <typename T>
+  auto get(std::span<T> recv_buf,
+           const dtype& dtype,
+           int target,
+           aint disp) const -> void {
+    get(recv_buf, dtype, target, disp, recv_buf.size(), dtype);
+  }
+
+  template <typename T>
+  auto get(std::span<T> recv_buf, int target, aint disp) const -> void {
+    get(recv_buf, to_dtype<T>(), target, disp);
+  }
+
+  template <typename T>
+  auto get(T& recv, const dtype& dtype, int target, aint disp) const -> void {
+    detail::container_adapter recv_adapter{recv};
+    get(recv_adapter.to_span(), dtype, target, disp);
+  }
+
+  template <typename T>
+  auto get(T& recv, int target, aint disp) const -> void {
+    auto recv_adapter = detail::container_adapter<T>{recv};
+    get(recv_adapter.to_span(), recv_adapter.to_dtype(), target, disp);
+  }
+  
 };
 
 class win_lock_all_adapter {

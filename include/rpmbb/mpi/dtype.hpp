@@ -83,6 +83,7 @@ template <> inline dtype to_dtype<long double>()        { return {MPI_LONG_DOUBL
 template <> inline dtype to_dtype<bool>()               { return {MPI_CXX_BOOL, false}; }
 template <> inline dtype to_dtype<std::byte>()          { return {MPI_BYTE, false}; }
 template <> inline dtype to_dtype<void*>()              { return to_dtype<uintptr_t>(); }
+template <> inline dtype to_dtype<aint>()               { return {MPI_AINT, false}; }
 // clang-format on
 
 }  // namespace rpmbb::mpi

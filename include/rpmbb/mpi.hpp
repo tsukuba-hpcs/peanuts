@@ -7,5 +7,7 @@
 #include "rpmbb/mpi/info.hpp"
 #include "rpmbb/mpi/memory.hpp"
 #include "rpmbb/mpi/raii.hpp"
+#include "rpmbb/mpi/status.hpp"
+#include "rpmbb/mpi/type_traits.hpp"
 #include "rpmbb/mpi/type.hpp"
 #include "rpmbb/mpi/win.hpp"

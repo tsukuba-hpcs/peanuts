@@ -223,15 +223,27 @@ auto main(int argc, char* argv[]) -> int try {
     mpi::dtype process_map_entry_dtype = mpi::dtype{mpi::to_dtype<int>(), 2};
     process_map_entry_dtype.commit();
     const auto entry = process_map_entry{intra_comm.rank(), inter_comm.rank()};
-    // comm.all_gather(std::as_bytes(std::span{&entry, 1}),
-    //                 std::as_writable_bytes(std::span{process_map}));
-    comm.all_gather(std::span{&entry, 1}, std::span{process_map},
-                    process_map_entry_dtype, process_map_entry_dtype);
-    // comm.all_gather(process_map_entry{intra_comm.rank(), inter_comm.rank()},
-    //                 std::as_writable_bytes(std::span{process_map}));
+    comm.all_gather(entry, process_map_entry_dtype, std::span{process_map},
+                    process_map_entry_dtype);
   }
+  int shift_unit = -1;
+  if (comm.rank() == 0) {
+    // find first process that is not in the same node
+    for (const auto& [idx, entry] : util::cenumerate(process_map)) {
+      if (entry.inter_rank != 0) {
+        shift_unit = idx;
+        break;
+      }
+    }
+    if (shift_unit < 0) {
+      fmt::print(stderr, "Warning: All processes are on the same node.\n");
+      shift_unit = 1;
+    }
+  }
+  comm.broadcast(shift_unit);
+  fmt::print("shft_unit: {}, my_rank: {}\n", shift_unit, comm.rank());
 
-  std::cout << rpmbb::util::make_inspector(process_map) << std::endl;
+  // std::cout << rpmbb::util::make_inspector(process_map) << std::endl;
 
   auto device = rpmbb::pmem2::device{parsed["path"].as<std::string>()};
   if (!device.is_devdax()) {
@@ -253,32 +265,78 @@ auto main(int argc, char* argv[]) -> int try {
   auto adapter = mpi::win_lock_all_adapter{win, MPI_MODE_NOCHECK};
   auto lock = std::unique_lock{adapter};
 
-  const auto xfer_buffer =
-      util::generate_random_alphanumeric_string(transfer_size);
+  // const auto random_data_buffer =
+  //     util::generate_random_alphanumeric_string(transfer_size);
+  const auto random_data_buffer =
+      std::string(transfer_size, std::to_string(comm.rank())[0]);
+  auto xfer_buffer = std::vector<std::byte>(transfer_size);
 
   // write
   auto disp = intra_comm.rank() * block_size;
+  auto disp_aint =
+      mpi::aint{map.address()} + mpi::aint{static_cast<MPI_Aint>(disp)};
+  fmt::print("my_rank: {}, disp: {}, disp_aint: {}\n", comm.rank(), disp,
+             disp_aint.native());
+
+  std::vector<mpi::aint> disps(comm.size());
+  comm.all_gather(disp_aint, std::span{disps});
+
   for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
-    ops.pwrite_nt(std::as_bytes(std::span(xfer_buffer)), disp + ofs);
+    ops.pwrite_nt(std::as_bytes(std::span{random_data_buffer}), disp + ofs);
   }
 
-  // read neighbor's data
+  win.sync();
+  comm.barrier();
+  win.sync();
 
-  // ops.pwrite_nt(std::as_bytes(std::span("test")), 0);
-  // ops.pwrite_nt(std::as_bytes(std::span("hoge")), 4);
-  // char buf[10];
-  // ops.pread(std::as_writable_bytes(std::span(buf, 4)), 2);
-  // buf[4] = '\0';
-  // if (std::string_view("stho") == buf) {
-  //   fmt::print("ok\n");
-  // } else {
-  //   fmt::print("ng\n");
-  // }
+  // read neighbor node's data
+  auto target_rank = (comm.rank() + shift_unit) % comm.size();
+  auto target_disp = disps[target_rank];
+  fmt::print("my_rank: {}, target_rank: {}, target_disp: {}\n", comm.rank(),
+             target_rank, target_disp.native());
 
-  if (parsed.count("prettify") != 0U) {
-    std::cout << std::setw(4);
+  for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
+    win.get(xfer_buffer, target_rank,
+            target_disp + mpi::aint{static_cast<MPI_Aint>(ofs)});
+    win.flush(target_rank);
   }
-  std::cout << bench_result << std::endl;
+
+  // verify xfer_buffer == neighbor's random_data_buffer
+  auto neighbor_random_data_buffer = std::vector<std::byte>(transfer_size);
+  comm.send_receive(random_data_buffer,
+                    (comm.rank() + (comm.size() - 1)) % comm.size(), 0,
+                    neighbor_random_data_buffer, target_rank);
+  if (!std::equal(xfer_buffer.begin(), xfer_buffer.end(),
+                  neighbor_random_data_buffer.begin(),
+                  neighbor_random_data_buffer.end())) {
+    fmt::print(stderr,
+               "Error: xfer_buffer != neighbor_random_data_buffer on rank {}\n",
+               comm.rank());
+    if (comm.rank() == 0) {
+      std::string str;
+      str.reserve(xfer_buffer.size());
+      std::transform(xfer_buffer.begin(), xfer_buffer.end(),
+                     std::back_inserter(str),
+                     [](std::byte b) { return static_cast<char>(b); });
+
+      fmt::print(stderr, "xfer_buffer: {}\n", str);
+      str.clear();
+      std::transform(neighbor_random_data_buffer.begin(),
+                     neighbor_random_data_buffer.end(), std::back_inserter(str),
+                     [](std::byte b) { return static_cast<char>(b); });
+
+      fmt::print(stderr, "neighbor_random_data_buffer: {}\n", str);
+      fmt::print(stderr, "my_random_data_buffer: {}\n", random_data_buffer);
+    }
+    return 1;
+  }
+
+  if (comm.rank() == 0) {
+    if (parsed.count("prettify") != 0U) {
+      std::cout << std::setw(4);
+    }
+    std::cout << bench_result << std::endl;
+  }
 
   return 0;
 } catch (const rpmbb::mpi::mpi_error& e) {
