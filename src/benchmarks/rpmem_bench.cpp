@@ -253,15 +253,18 @@ auto main(int argc, char* argv[]) -> int try {
   auto config = rpmbb::pmem2::config{PMEM2_GRANULARITY_PAGE};
   auto map = rpmbb::pmem2::map{source, config};
 
-  auto* pmem_addr = static_cast<char*>(map.address());
-  bench_result["pmem_addr"] = fmt::format("{}", fmt::ptr(pmem_addr));
+  auto disp = intra_comm.rank() * block_size;
+  auto my_block_span = map.as_span().subspan(disp, block_size);
+
+  // bench_result["pmem_addr"] = fmt::format("{}",
+  // fmt::ptr(my_block_span.data()));
   bench_result["pmem_size"] = map.size();
   bench_result["pmem_store_granularity"] = map.store_granularity();
 
   auto ops = rpmbb::pmem2::file_operations(map);
 
   auto win = mpi::win{comm};
-  win.attach(map.as_span());
+  win.attach(my_block_span);
   auto adapter = mpi::win_lock_all_adapter{win, MPI_MODE_NOCHECK};
   auto lock = std::unique_lock{adapter};
 
@@ -272,11 +275,7 @@ auto main(int argc, char* argv[]) -> int try {
   auto xfer_buffer = std::vector<std::byte>(transfer_size);
 
   // write
-  auto disp = intra_comm.rank() * block_size;
-  auto disp_aint =
-      mpi::aint{map.address()} + mpi::aint{static_cast<MPI_Aint>(disp)};
-  fmt::print("my_rank: {}, disp: {}, disp_aint: {}\n", comm.rank(), disp,
-             disp_aint.native());
+  auto disp_aint = mpi::aint{my_block_span.data()};
 
   std::vector<mpi::aint> disps(comm.size());
   comm.all_gather(disp_aint, std::span{disps});
@@ -304,7 +303,7 @@ auto main(int argc, char* argv[]) -> int try {
   // verify xfer_buffer == neighbor's random_data_buffer
   auto neighbor_random_data_buffer = std::vector<std::byte>(transfer_size);
   comm.send_receive(random_data_buffer,
-                    (comm.rank() + (comm.size() - 1)) % comm.size(), 0,
+                    (comm.rank() + (comm.size() - shift_unit)) % comm.size(), 0,
                     neighbor_random_data_buffer, target_rank);
   if (!std::equal(xfer_buffer.begin(), xfer_buffer.end(),
                   neighbor_random_data_buffer.begin(),
@@ -312,22 +311,22 @@ auto main(int argc, char* argv[]) -> int try {
     fmt::print(stderr,
                "Error: xfer_buffer != neighbor_random_data_buffer on rank {}\n",
                comm.rank());
-    if (comm.rank() == 0) {
-      std::string str;
-      str.reserve(xfer_buffer.size());
-      std::transform(xfer_buffer.begin(), xfer_buffer.end(),
-                     std::back_inserter(str),
-                     [](std::byte b) { return static_cast<char>(b); });
+    // if (comm.rank() == 0) {
+    //   std::string str;
+    //   str.reserve(xfer_buffer.size());
+    //   std::transform(xfer_buffer.begin(), xfer_buffer.end(),
+    //                  std::back_inserter(str),
+    //                  [](std::byte b) { return static_cast<char>(b); });
 
-      fmt::print(stderr, "xfer_buffer: {}\n", str);
-      str.clear();
-      std::transform(neighbor_random_data_buffer.begin(),
-                     neighbor_random_data_buffer.end(), std::back_inserter(str),
-                     [](std::byte b) { return static_cast<char>(b); });
+    //   fmt::print(stderr, "xfer_buffer: {}\n", str);
+    //   str.clear();
+    //   std::transform(neighbor_random_data_buffer.begin(),
+    //                  neighbor_random_data_buffer.end(), std::back_inserter(str),
+    //                  [](std::byte b) { return static_cast<char>(b); });
 
-      fmt::print(stderr, "neighbor_random_data_buffer: {}\n", str);
-      fmt::print(stderr, "my_random_data_buffer: {}\n", random_data_buffer);
-    }
+    //   fmt::print(stderr, "neighbor_random_data_buffer: {}\n", str);
+    //   fmt::print(stderr, "my_random_data_buffer: {}\n", random_data_buffer);
+    // }
     return 1;
   }
 
