@@ -24,14 +24,18 @@ class aint {
   MPI_Aint native() const { return addr_; }
   operator MPI_Aint() const { return addr_; }
 
-  auto operator+(aint disp) -> aint const { return MPI_Aint_add(addr_, disp); }
+  auto operator+(aint disp) -> aint const {
+    return MPI_Aint_add(addr_, disp.addr_);
+  }
   auto operator+=(aint disp) -> aint& {
-    addr_ = MPI_Aint_add(addr_, disp);
+    addr_ = MPI_Aint_add(addr_, disp.addr_);
     return *this;
   }
-  auto operator-(aint sub) -> aint const { return MPI_Aint_diff(addr_, sub); }
+  auto operator-(aint sub) -> aint const {
+    return MPI_Aint_diff(addr_, sub.addr_);
+  }
   auto operator-=(aint sub) -> aint& {
-    addr_ = MPI_Aint_diff(addr_, sub);
+    addr_ = MPI_Aint_diff(addr_, sub.addr_);
     return *this;
   }
 
