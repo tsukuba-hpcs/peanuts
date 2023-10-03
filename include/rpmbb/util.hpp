@@ -6,6 +6,7 @@
 #include "rpmbb/util/gen_random_string.hpp"
 #include "rpmbb/util/sense_barrier.hpp"
 #include "rpmbb/util/singleton.hpp"
+#include "rpmbb/util/stopwatch.hpp"
 #include "rpmbb/util/tls.hpp"
 #include "rpmbb/util/tsc.hpp"
 #include "rpmbb/util/varint_encoding.hpp"
