@@ -281,9 +281,9 @@ auto main(int argc, char* argv[]) -> int try {
   std::vector<mpi::aint> disps(comm.size());
   comm.all_gather(disp_aint, std::span{disps});
 
-  auto wf_write = rpmbb::util::welford<uint64_t>{};
-  auto wf_read = rpmbb::util::welford<uint64_t>{};
-  auto sw = rpmbb::util::stopwatch<uint64_t, std::nano>{};
+  auto wf_write = rpmbb::util::welford<double>{};
+  auto wf_read = rpmbb::util::welford<double>{};
+  auto sw = rpmbb::util::stopwatch<double, std::ratio<1, 1>>{};
   for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
     ops.pwrite_nt(std::as_bytes(std::span{random_data_buffer}), disp + ofs);
     wf_write.add(sw.get_and_reset().count());
@@ -338,26 +338,46 @@ auto main(int argc, char* argv[]) -> int try {
     return 1;
   }
 
-  bench_result["write"] = {
-      {"elapsed_time_sec", wf_write.mean() / 1e9 * wf_write.n()},
-      {"ops_per_sec", wf_write.n() / wf_write.mean() * 1e9},
-      {"bytes_per_sec", wf_write.n() * transfer_size / wf_write.mean() * 1e9},
-      {"n", wf_write.n()},
-      {"mean", wf_write.mean()},
-      {"var", wf_write.var()},
-      {"std", wf_write.std()},
-  };
-  bench_result["read"] = {
-      {"elapsed_time_sec", wf_read.mean() / 1e9 * wf_read.n()},
-      {"ops_per_sec", wf_read.n() / wf_read.mean() * 1e9},
-      {"bytes_per_sec", wf_write.n() * transfer_size / wf_write.mean() * 1e9},
-      {"n", wf_read.n()},
-      {"mean", wf_read.mean()},
-      {"var", wf_read.var()},
-      {"std", wf_read.std()},
-  };
-
   if (comm.rank() == 0) {
+    auto func_summary = [](size_t np, size_t n, double mean,
+                           size_t transfer_size) {
+      auto total_nops = n * np;
+      auto elapsed_time_sec = mean * n;
+      auto ops_per_sec = total_nops / elapsed_time_sec;
+      auto bytes_per_sec = total_nops * transfer_size / elapsed_time_sec;
+      return std::tie(total_nops, elapsed_time_sec, ops_per_sec, bytes_per_sec);
+    };
+    {
+      auto [total_nops, elapsed_time_sec, ops_per_sec, bytes_per_sec] =
+          func_summary(comm.size(), wf_write.n(), wf_write.mean(),
+                       transfer_size);
+      bench_result["write"] = {
+          {"elapsed_time_sec", elapsed_time_sec},
+          {"ops_per_sec", ops_per_sec},
+          {"bytes_per_sec", bytes_per_sec},
+          {"gbytes_per_sec", bytes_per_sec / (1 << 30)},
+          {"nops_per_proc", wf_write.n()},
+          {"mean", wf_write.mean()},
+          {"var", wf_write.var()},
+          {"std", wf_write.std()},
+      };
+    }
+
+    {
+      auto [total_nops, elapsed_time_sec, ops_per_sec, bytes_per_sec] =
+          func_summary(comm.size(), wf_read.n(), wf_read.mean(), transfer_size);
+      bench_result["read"] = {
+          {"elapsed_time_sec", elapsed_time_sec},
+          {"ops_per_sec", ops_per_sec},
+          {"bytes_per_sec", bytes_per_sec},
+          {"gbytes_per_sec", bytes_per_sec / (1 << 30)},
+          {"nops_per_proc", wf_read.n()},
+          {"mean", wf_read.mean()},
+          {"var", wf_read.var()},
+          {"std", wf_read.std()},
+      };
+    }
+
     if (parsed.count("prettify") != 0U) {
       std::cout << std::setw(4);
     }
