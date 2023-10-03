@@ -4,29 +4,38 @@
 # configuration settings.
 spack:
   # add package specs to the `specs` list
-  specs: 
-  - openmpi@git.v5.0.0rc12=main +cuda cuda_arch=90 fabrics=ucx,cma,verbs,psm2
-    ^ucx@1.14.1 +cuda cuda_arch=90 +gdrcopy +mlx5_dv +cma +dc +dm +ud +ib_hw_tm +rc +verbs +rdmacm
-  - cuda@12.1.1
+  specs:
+  - gcc@13
+  - openmpi@git.v5.0.0rc12=main fabrics=ucx,cma +internal-pmix +internal-hwloc
+    ^ucx@1.14.1 +mlx5_dv +cma +dc +dm +ud +ib_hw_tm +rc +rdmacm +verbs
   - intel-mpi-benchmarks ^openmpi
+  - pmdk@2 +ndctl
   view: true
   concretizer:
     unify: true
-  compilers:
-  - compiler:
-      spec: gcc@=9.4.0
-      paths:
-        cc: /usr/bin/gcc
-        cxx: /usr/bin/g++
-        f77: /usr/bin/gfortran
-        fc: /usr/bin/gfortran
-      flags: {}
-      operating_system: ubuntu20.04
-      target: x86_64
-      modules: []
-      environment: {}
-      extra_rpaths: []
   packages:
+    ndctl:
+      externals:
+      - spec: ndctl@67
+        prefix: /usr
+      buildable: false
+    ncurses:
+      externals:
+      - spec: ncurses@6.3.20211021+termlib abi=6
+        prefix: /system/apps/ubuntu/20.04-202210/oneapi/2022.3.1/intelpython/latest
+      - spec: ncurses@6.2.20200212+symlinks+termlib abi=6
+        prefix: /usr
+    gettext:
+      externals:
+      - spec: gettext@0.19.8.1
+        prefix: /usr
+    openssl:
+      externals:
+      - spec: openssl@1.1.1q
+        prefix: /system/apps/ubuntu/20.04-202210/oneapi/2022.3.1/intelpython/latest
+      - spec: openssl@1.1.1f
+        prefix: /usr
+      buildable: false
     rdma-core:
       externals:
       - spec: rdma-core@56mlnx40-1.57102
@@ -43,11 +52,6 @@ spack:
       externals:
       - spec: perl@5.30.0~cpanm+open+shared+threads
         prefix: /usr
-    pkg-config:
-      externals:
-      - spec: pkg-config@0.29.1
-        prefix: /usr
-      buildable: false
     swig:
       externals:
       - spec: swig@4.0.1
@@ -72,10 +76,6 @@ spack:
       externals:
       - spec: diffutils@3.7
         prefix: /usr
-    texinfo:
-      externals:
-      - spec: texinfo@6.7
-        prefix: /usr
     curl:
       externals:
       - spec: curl@7.68.0+gssapi+ldap+nghttp2
@@ -87,12 +87,6 @@ spack:
     flex:
       externals:
       - spec: flex@2.6.4+lex
-        prefix: /usr
-    openssl:
-      externals:
-      - spec: openssl@1.1.1q
-        prefix: /system/apps/ubuntu/20.04-202210/oneapi/2022.3.1/intelpython/latest
-      - spec: openssl@1.1.1f
         prefix: /usr
     gmake:
       externals:
@@ -147,4 +141,10 @@ spack:
   config:
     build_stage:
     - /work/NBB/$user/spack-stage
+
+  modules:
+    prefix_inspections:
+      lib64: [LD_LIBRARY_PATH]
+      lib:
+      - LD_LIBRARY_PATH
 
