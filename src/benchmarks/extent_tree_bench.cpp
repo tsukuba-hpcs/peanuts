@@ -213,7 +213,7 @@ auto main(int argc, char const* argv[]) -> int {
   std::vector<std::thread> threads;
   std::vector<std::vector<bench_stats>> bench_stats_per_thread(nthreads);
   std::vector<size_t> tree_sizes(nthreads);
-  rpmbb::SenseBarrier barrier(nthreads);
+  rpmbb::util::sense_barrier barrier(nthreads);
 
   for (size_t tid = 0; tid < nthreads; ++tid) {
     threads.emplace_back([&, tid]() {

@@ -4,13 +4,13 @@
 
 #include "tls.hpp"
 
-namespace rpmbb {
+namespace rpmbb::util {
 
-class SenseBarrier {
-  SenseBarrier() = delete;
+class sense_barrier {
+  sense_barrier() = delete;
 
  public:
-  explicit SenseBarrier(size_t nthreads)
+  explicit sense_barrier(size_t nthreads)
       : nthreads_(static_cast<int>(nthreads)),
         waits_(static_cast<int>(nthreads)),
         sense_(true),

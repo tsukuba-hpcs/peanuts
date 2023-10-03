@@ -1,6 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "rpmbb/tsc.hpp"
+#include "rpmbb/util/tsc.hpp"
 #include <doctest/doctest.h>
 using namespace rpmbb;
 

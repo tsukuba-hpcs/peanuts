@@ -1,8 +1,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <doctest/doctest.h>
-#include "rpmbb/delta_encoding.hpp"
-#include "rpmbb/varint_encoding.hpp"
+#include "rpmbb/util/delta_encoding.hpp"
+#include "rpmbb/util/varint_encoding.hpp"
 using namespace rpmbb;
 
 #include <iostream>

@@ -1,13 +1,7 @@
 #pragma once
-#include "rpmbb/cpu_affinity_manager.hpp"
-#include "rpmbb/delta_encoding.hpp"
 #include "rpmbb/extent_tree.hpp"
 #include "rpmbb/inspector.hpp"
 #include "rpmbb/mpi.hpp"
 #include "rpmbb/pmem2.hpp"
-#include "rpmbb/sense_barrier.hpp"
-#include "rpmbb/tls.hpp"
-#include "rpmbb/tsc.hpp"
 #include "rpmbb/util.hpp"
-#include "rpmbb/varint_encoding.hpp"
 #include "rpmbb/version.h"
