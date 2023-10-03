@@ -24,12 +24,12 @@ RUN \
   && apt-get clean -y \
   && rm -rf /var/lib/apt/lists/*
 
-# RUN \
-#   # additinal packages
-#   export DEBIAN_FRONTEND=noninteractive \
-#   && apt-get -y install --no-install-recommends \
-#     flex \
-#   # Clean up
-#   && apt-get autoremove -y \
-#   && apt-get clean -y \
-#   && rm -rf /var/lib/apt/lists/*
+RUN \
+  # additinal packages
+  export DEBIAN_FRONTEND=noninteractive \
+  && apt-get -y install --no-install-recommends \
+    flex \
+  # Clean up
+  && apt-get autoremove -y \
+  && apt-get clean -y \
+  && rm -rf /var/lib/apt/lists/*
