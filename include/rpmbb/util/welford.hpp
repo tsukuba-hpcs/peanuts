@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <vector>
 
-namespace rpmbb {
+namespace rpmbb::util {
 
 class welford {
  public:

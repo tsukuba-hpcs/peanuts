@@ -23,7 +23,7 @@
 using ordered_json = nlohmann::ordered_json;
 
 struct bench_stats {
-  rpmbb::welford wf;
+  rpmbb::util::welford wf;
   uint64_t elapsed_cycles;
 };
 
@@ -37,8 +37,8 @@ struct adl_serializer<std::chrono::duration<Rep, Period>> {
 };
 
 template <>
-struct adl_serializer<rpmbb::welford> {
-  static void to_json(ordered_json& j, const rpmbb::welford& welford) {
+struct adl_serializer<rpmbb::util::welford> {
+  static void to_json(ordered_json& j, const rpmbb::util::welford& welford) {
     j["n"] = welford.n();
     // j["mean"] = rpmbb::util::tsc::to_nsec(welford.mean());
     // j["var"] = rpmbb::util::tsc::to_nsec(welford.var());
@@ -64,7 +64,7 @@ struct adl_serializer<bench_stats> {
 
 }  // namespace nlohmann
 
-namespace rpmbb {
+namespace rpmbb::util {
 std::ostream& inspect(std::ostream& os, const welford& wf) {
   os << "{n:" << wf.n() << ',';
   os << "mean:" << wf.mean() << ',';
@@ -100,10 +100,10 @@ class time_window {
   uint64_t t_prev_;
   uint64_t t_now_;
   uint64_t window_cycles_;
-  rpmbb::welford& wf_;
+  rpmbb::util::welford& wf_;
 
  public:
-  time_window(uint64_t window_cycles, rpmbb::welford& wf)
+  time_window(uint64_t window_cycles, rpmbb::util::welford& wf)
       : t_window_start_(rpmbb::util::tsc::get()),
         t_prev_(t_window_start_),
         t_now_(t_window_start_),
@@ -140,7 +140,7 @@ std::vector<bench_stats> aggregate_status_in_same_window(
   while (remain) {
     uint64_t max_cycles = 0;
     remain = false;
-    std::vector<rpmbb::welford> welfords;
+    std::vector<rpmbb::util::welford> welfords;
     for (auto& stats_in_a_thread : bench_stats_per_thread) {
       if (window_id < stats_in_a_thread.size()) {
         welfords.push_back(stats_in_a_thread[window_id].wf);
@@ -151,7 +151,7 @@ std::vector<bench_stats> aggregate_status_in_same_window(
     }
     if (remain) {
       result.push_back(
-          {rpmbb::welford::from_range(welfords.begin(), welfords.end()),
+          {rpmbb::util::welford::from_range(welfords.begin(), welfords.end()),
            max_cycles});
     }
     ++window_id;

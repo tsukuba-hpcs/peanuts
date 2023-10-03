@@ -11,4 +11,3 @@
 #include "rpmbb/util.hpp"
 #include "rpmbb/varint_encoding.hpp"
 #include "rpmbb/version.h"
-#include "rpmbb/welford.hpp"
