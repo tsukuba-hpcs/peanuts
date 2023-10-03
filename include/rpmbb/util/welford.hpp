@@ -4,13 +4,17 @@
 #include <cstdint>
 #include <iterator>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 namespace rpmbb::util {
 
+template <typename T>
 class welford {
  public:
-  void add(uint64_t x) {
+  static_assert(std::is_arithmetic_v<T>, "T must be an arithmetic type");
+
+  void add(T x) {
     ++n_;
     double delta = static_cast<double>(x) - mean_;
     mean_ += delta / static_cast<double>(n_);
@@ -90,4 +94,4 @@ class welford {
   double m2_{0.0};
 };
 
-}  // namespace rpmbb
+}  // namespace rpmbb::util

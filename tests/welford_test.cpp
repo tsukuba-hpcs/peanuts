@@ -10,7 +10,7 @@
 using namespace rpmbb::util;
 
 TEST_CASE("Welford mean variance and std test") {
-  welford stats;
+  welford<uint64_t> stats;
 
   // Test empty
   CHECK_THROWS(stats.mean());
@@ -42,8 +42,8 @@ TEST_CASE("Test from_range method in welford class") {
 
   const int n = 10;  // number of welford instances
   const int i = 100;   // number of samples in each welford instance
-  std::vector<welford> welfords(n);
-  welford overall_welford;
+  std::vector<welford<uint64_t>> welfords(n);
+  welford<uint64_t> overall_welford;
 
   for (int j = 0; j < n; ++j) {
     for (int k = 0; k < i; ++k) {
@@ -54,10 +54,22 @@ TEST_CASE("Test from_range method in welford class") {
   }
 
   auto combined_welford =
-      welford::from_range(welfords.begin(), welfords.end());
+      welford<uint64_t>::from_range(welfords.begin(), welfords.end());
 
   CHECK(combined_welford.n() == overall_welford.n());
   CHECK(doctest::Approx(combined_welford.mean()) == overall_welford.mean());
   CHECK(doctest::Approx(combined_welford.var()) == overall_welford.var());
   CHECK(doctest::Approx(combined_welford.std()) == overall_welford.std());
+}
+
+TEST_CASE("Welford<double>") {
+  rpmbb::util::welford<double> wf;
+  wf.add(1.0);
+  wf.add(2.0);
+  wf.add(3.0);
+
+  REQUIRE(wf.n() == 3);
+  REQUIRE(wf.mean() == doctest::Approx(2.0));
+  REQUIRE(wf.var() == doctest::Approx(1.0));
+  REQUIRE(wf.std() == doctest::Approx(1.0));
 }
