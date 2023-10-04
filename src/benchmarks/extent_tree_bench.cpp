@@ -17,7 +17,7 @@
 using ordered_json = nlohmann::ordered_json;
 
 struct bench_stats {
-  rpmbb::util::welford<uint64_t> wf;
+  rpmbb::util::welford wf;
   uint64_t elapsed_cycles;
 };
 
@@ -31,8 +31,8 @@ struct adl_serializer<std::chrono::duration<Rep, Period>> {
 };
 
 template <>
-struct adl_serializer<rpmbb::util::welford<uint64_t>> {
-  static void to_json(ordered_json& j, const rpmbb::util::welford<uint64_t>& welford) {
+struct adl_serializer<rpmbb::util::welford> {
+  static void to_json(ordered_json& j, const rpmbb::util::welford& welford) {
     j["n"] = welford.n();
     // j["mean"] = rpmbb::util::tsc::to_nsec(welford.mean());
     // j["var"] = rpmbb::util::tsc::to_nsec(welford.var());
@@ -59,7 +59,7 @@ struct adl_serializer<bench_stats> {
 }  // namespace nlohmann
 
 namespace rpmbb::util {
-std::ostream& inspect(std::ostream& os, const welford<uint64_t>& wf) {
+std::ostream& inspect(std::ostream& os, const welford& wf) {
   os << "{n:" << wf.n() << ',';
   os << "mean:" << wf.mean() << ',';
   os << "var:" << wf.var() << ',';
@@ -94,10 +94,10 @@ class time_window {
   uint64_t t_prev_;
   uint64_t t_now_;
   uint64_t window_cycles_;
-  rpmbb::util::welford<uint64_t>& wf_;
+  rpmbb::util::welford& wf_;
 
  public:
-  time_window(uint64_t window_cycles, rpmbb::util::welford<uint64_t>& wf)
+  time_window(uint64_t window_cycles, rpmbb::util::welford& wf)
       : t_window_start_(rpmbb::util::tsc::get()),
         t_prev_(t_window_start_),
         t_now_(t_window_start_),
@@ -134,7 +134,7 @@ std::vector<bench_stats> aggregate_status_in_same_window(
   while (remain) {
     uint64_t max_cycles = 0;
     remain = false;
-    std::vector<rpmbb::util::welford<uint64_t>> welfords;
+    std::vector<rpmbb::util::welford> welfords;
     for (auto& stats_in_a_thread : bench_stats_per_thread) {
       if (window_id < stats_in_a_thread.size()) {
         welfords.push_back(stats_in_a_thread[window_id].wf);
@@ -145,7 +145,7 @@ std::vector<bench_stats> aggregate_status_in_same_window(
     }
     if (remain) {
       result.push_back(
-          {rpmbb::util::welford<uint64_t>::from_range(welfords.begin(), welfords.end()),
+          {rpmbb::util::welford::from_range(welfords.begin(), welfords.end()),
            max_cycles});
     }
     ++window_id;
@@ -224,7 +224,7 @@ auto main(int argc, char const* argv[]) -> int {
 
       if (add) {
         rpmbb::extent ex(0, extent_size);
-        rpmbb::util::welford<uint64_t> wf;
+        rpmbb::util::welford wf;
         barrier.wait();
 
         time_window tw(window_cycles, wf);
@@ -254,13 +254,13 @@ auto main(int argc, char const* argv[]) -> int {
           bench_stats_per_thread.clear();
           bench_stats_per_thread.resize(nthreads);
 
-          std::vector<rpmbb::util::welford<uint64_t>> welfords;
+          std::vector<rpmbb::util::welford> welfords;
           for (auto& st : stats) {
             welfords.push_back(st.wf);
           }
           // std::cout << rpmbb::util::make_inspector(welfords) << std::endl;
           auto combined_welford =
-              rpmbb::util::welford<uint64_t>::from_range(welfords.begin(), welfords.end());
+              rpmbb::util::welford::from_range(welfords.begin(), welfords.end());
 
           bench_result["add"] = {
               // {"elapsed", elapsed_ms},
@@ -275,7 +275,7 @@ auto main(int argc, char const* argv[]) -> int {
 
       if (find) {
         rpmbb::extent ex(0, extent_size);
-        rpmbb::util::welford<uint64_t> wf;
+        rpmbb::util::welford wf;
         barrier.wait();
 
         time_window tw(window_cycles, wf);
@@ -304,12 +304,12 @@ auto main(int argc, char const* argv[]) -> int {
           bench_stats_per_thread.clear();
           bench_stats_per_thread.resize(nthreads);
 
-          std::vector<rpmbb::util::welford<uint64_t>> welfords;
+          std::vector<rpmbb::util::welford> welfords;
           for (auto& st : stats) {
             welfords.push_back(st.wf);
           }
           auto combined_welford =
-              rpmbb::util::welford<uint64_t>::from_range(welfords.begin(), welfords.end());
+              rpmbb::util::welford::from_range(welfords.begin(), welfords.end());
 
           bench_result["find"] = {
               {"total", bench_stats{combined_welford, t1 - t0}},
@@ -320,7 +320,7 @@ auto main(int argc, char const* argv[]) -> int {
 
       if (remove) {
         rpmbb::extent ex(0, extent_size);
-        rpmbb::util::welford<uint64_t> wf;
+        rpmbb::util::welford wf;
         barrier.wait();
 
         time_window tw(window_cycles, wf);
@@ -347,12 +347,12 @@ auto main(int argc, char const* argv[]) -> int {
         if (tid == 0) {
           auto stats = aggregate_status_in_same_window(bench_stats_per_thread);
 
-          std::vector<rpmbb::util::welford<uint64_t>> welfords;
+          std::vector<rpmbb::util::welford> welfords;
           for (auto& st : stats) {
             welfords.push_back(st.wf);
           }
           auto combined_welford =
-              rpmbb::util::welford<uint64_t>::from_range(welfords.begin(), welfords.end());
+              rpmbb::util::welford::from_range(welfords.begin(), welfords.end());
 
           bench_result["remove"] = {
               {"total", bench_stats{combined_welford, t1 - t0}},

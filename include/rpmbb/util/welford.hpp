@@ -9,12 +9,11 @@
 
 namespace rpmbb::util {
 
-template <typename T>
 class welford {
  public:
-  static_assert(std::is_arithmetic_v<T>, "T must be an arithmetic type");
-
+  template <typename T>
   void add(T x) {
+    static_assert(std::is_arithmetic_v<T>, "T must be an arithmetic type");
     ++n_;
     double delta = static_cast<double>(x) - mean_;
     mean_ += delta / static_cast<double>(n_);
@@ -22,7 +21,9 @@ class welford {
     m2_ += delta * delta2;
   }
 
-  auto n() const -> uint64_t { return n_; }
+  auto sum() const -> double { return n() * mean(); }
+
+  auto n() const -> size_t { return n_; }
 
   auto mean() const -> double {
     if (n_ < 1) {
@@ -43,13 +44,13 @@ class welford {
 
   template <typename Iterator>
   static welford from_range(Iterator begin, Iterator end) {
-    uint64_t total_n = 0;
+    size_t total_n = 0;
     double total_mean = 0.0;
     double total_m2 = 0.0;
 
     for (auto it = begin; it != end; ++it) {
-      uint64_t n = it->n();
-      double mean = it->mean();
+      auto n = it->n();
+      auto mean = it->mean();
 
       total_n += n;
       total_mean += mean * n;
@@ -62,9 +63,9 @@ class welford {
     double grand_mean = total_mean / total_n;
 
     for (auto it = begin; it != end; ++it) {
-      uint64_t n = it->n();
-      double mean = it->mean();
-      double m2 = it->m2_;
+      auto n = it->n();
+      auto mean = it->mean();
+      auto m2 = it->m2_;
 
       total_m2 += m2 + n * (mean - grand_mean) * (mean - grand_mean);
     }
@@ -89,7 +90,7 @@ class welford {
   }
 
  private:
-  uint64_t n_{0};
+  size_t n_{0};
   double mean_{0.0};
   double m2_{0.0};
 };
