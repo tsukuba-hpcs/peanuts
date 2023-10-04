@@ -12,7 +12,7 @@ namespace rpmbb::mpi {
 template <typename T = void>
 T* allocate(aint size, const info& info = MPI_INFO_NULL) {
   T* result{};
-  MPI_CHECK_ERROR_CODE(MPI_Alloc_mem(size, info.native(), result));
+  MPI_CHECK_ERROR_CODE(MPI_Alloc_mem(size, info.native(), &result));
   return result;
 }
 
