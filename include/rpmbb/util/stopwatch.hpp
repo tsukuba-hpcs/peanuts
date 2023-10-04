@@ -14,9 +14,9 @@ class basic_stopwatch {
   using duration = std::chrono::duration<rep, period>;
   using time_point = std::chrono::time_point<clock, duration>;
 
-  basic_stopwatch() : start_time_(clock::now()) {}
+  basic_stopwatch() : start_time_(clock::now()), last_lap_time_(start_time_) {}
 
-  void reset() { start_time_ = clock::now(); }
+  void reset() { reset(clock::now()); }
 
   duration get() const {
     return std::chrono::duration_cast<duration>(clock::now() - start_time_);
@@ -24,22 +24,30 @@ class basic_stopwatch {
 
   duration get_and_reset() {
     auto current_time = clock::now();
-    auto elapsed = current_time - start_time_;
-    start_time_ = current_time;
-    return std::chrono::duration_cast<duration>(elapsed);
+    auto elapsed_time = current_time - start_time_;
+    reset(current_time);
+    return std::chrono::duration_cast<duration>(elapsed_time);
   }
 
-  rep count() const {
-    return std::chrono::duration_cast<duration>(clock::now() - start_time_)
-        .count();
+  duration lap_time() {
+    auto current_time = clock::now();
+    auto lap = current_time - last_lap_time_;
+    last_lap_time_ = current_time;
+    return std::chrono::duration_cast<duration>(lap);
+  }
+
+ private:
+  void reset(const clock::time_point& tp) {
+    start_time_ = tp;
+    last_lap_time_ = start_time_;
   }
 
  private:
   typename clock::time_point start_time_;
+  typename clock::time_point last_lap_time_;
 };
 
-template <typename Rep = std::chrono::high_resolution_clock::rep,
-          typename Period = std::chrono::high_resolution_clock::period>
+template <typename Rep = double, typename Period = std::ratio<1, 1>>
 using stopwatch =
     basic_stopwatch<std::chrono::high_resolution_clock, Rep, Period>;
 

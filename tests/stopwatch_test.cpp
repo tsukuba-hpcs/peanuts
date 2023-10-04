@@ -24,9 +24,17 @@ TEST_CASE_TEMPLATE("Generic Stopwatch Test",
   CHECK(after_sleep_duration >= sleep_duration - epsilon);
   CHECK(after_sleep_duration <= sleep_duration + epsilon);
 
-  auto same_duration = sw.get_and_reset();
-  CHECK(same_duration >= after_sleep_duration - epsilon);
-  CHECK(same_duration <= after_sleep_duration + epsilon);
+  auto first_lap_time = sw.lap_time();
+  CHECK(first_lap_time >= after_sleep_duration - epsilon);
+  CHECK(first_lap_time <= after_sleep_duration + epsilon);
+
+  auto second_lap_time = sw.lap_time();
+  CHECK(second_lap_time <= epsilon);
+
+  auto get_and_reset = sw.get_and_reset();
+  CHECK(second_lap_time <= get_and_reset);
+  CHECK(initial_duration < get_and_reset);
+  CHECK(after_sleep_duration <= get_and_reset);
 
   auto after_reset_duration = sw.get();
   CHECK(after_reset_duration <= epsilon);

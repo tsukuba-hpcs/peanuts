@@ -286,7 +286,7 @@ auto main(int argc, char* argv[]) -> int try {
   auto sw = rpmbb::util::stopwatch<double, std::ratio<1, 1>>{};
   for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
     ops.pwrite_nt(std::as_bytes(std::span{random_data_buffer}), disp + ofs);
-    wf_write.add(sw.get_and_reset().count());
+    wf_write.add(sw.lap_time().count());
   }
 
   win.sync();
@@ -304,7 +304,7 @@ auto main(int argc, char* argv[]) -> int try {
     win.get(xfer_buffer, target_rank,
             target_disp + mpi::aint{static_cast<MPI_Aint>(ofs)});
     win.flush(target_rank);
-    wf_read.add(sw.get_and_reset().count());
+    wf_read.add(sw.lap_time().count());
   }
 
   // verify xfer_buffer == neighbor's random_data_buffer
