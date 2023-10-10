@@ -146,52 +146,52 @@ TEST_CASE("Inspect std::chrono::duration") {
     std::ostringstream os;
     std::chrono::years years(1);
     inspector<decltype(years)>::inspect(os, years);
-    CHECK(os.str() == "1 y");
+    CHECK(os.str() == "1y");
 
     os.str("");
     std::chrono::duration<int, std::ratio<2629746>> months(1);
     inspector<decltype(months)>::inspect(os, months);
-    CHECK(os.str() == "1 mo");
+    CHECK(os.str() == "1mo");
 
     os.str("");
     std::chrono::duration<int, std::ratio<604800>> weeks(1);
     inspector<decltype(weeks)>::inspect(os, weeks);
-    CHECK(os.str() == "1 w");
+    CHECK(os.str() == "1w");
 
     os.str("");
     std::chrono::days days(1);
     inspector<decltype(days)>::inspect(os, days);
-    CHECK(os.str() == "1 d");
+    CHECK(os.str() == "1d");
 
     os.str("");
     std::chrono::hours hours(1);
     inspector<decltype(hours)>::inspect(os, hours);
-    CHECK(os.str() == "1 h");
+    CHECK(os.str() == "1h");
 
     os.str("");
     std::chrono::minutes minutes(1);
     inspector<decltype(minutes)>::inspect(os, minutes);
-    CHECK(os.str() == "1 min");
+    CHECK(os.str() == "1min");
 
     os.str("");
     std::chrono::seconds seconds(1);
     inspector<decltype(seconds)>::inspect(os, seconds);
-    CHECK(os.str() == "1 s");
+    CHECK(os.str() == "1s");
 
     os.str("");
     std::chrono::milliseconds ms(1);
     inspector<decltype(ms)>::inspect(os, ms);
-    CHECK(os.str() == "1 ms");
+    CHECK(os.str() == "1ms");
 
     os.str("");
     std::chrono::microseconds us(1);
     inspector<decltype(us)>::inspect(os, us);
-    CHECK(os.str() == "1 us");
+    CHECK(os.str() == "1us");
 
     os.str("");
     std::chrono::nanoseconds ns(1);
     inspector<decltype(ns)>::inspect(os, ns);
-    CHECK(os.str() == "1 ns");
+    CHECK(os.str() == "1ns");
   }
 
   SUBCASE("Inspect floating-point rep") {
@@ -200,18 +200,18 @@ TEST_CASE("Inspect std::chrono::duration") {
 
     std::chrono::duration<double, std::chrono::seconds::period> seconds(1.23);
     inspector<decltype(seconds)>::inspect(os, seconds);
-    CHECK(os.str() == "1.23 s");
+    CHECK(os.str() == "1.23s");
 
     os.str("");
 
     std::chrono::duration<double, std::chrono::milliseconds::period> ms(1.23);
     inspector<decltype(ms)>::inspect(os, ms);
-    CHECK(os.str() == "1.23 ms");
+    CHECK(os.str() == "1.23ms");
 
     os.str("");
 
     std::chrono::duration<double, std::chrono::microseconds::period> us(1.23);
     inspector<decltype(us)>::inspect(os, us);
-    CHECK(os.str() == "1.23 us");
+    CHECK(os.str() == "1.23us");
   }
 }

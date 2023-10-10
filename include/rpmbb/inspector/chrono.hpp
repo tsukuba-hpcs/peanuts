@@ -41,7 +41,7 @@ struct inspector<std::chrono::duration<Rep, Period>> {
   static auto inspect(std::ostream& os,
                       const std::chrono::duration<Rep, Period>& obj)
       -> std::ostream& {
-    return os << obj.count() << ' ' << get_duration_unit<Period>();
+    return os << obj.count() << get_duration_unit<Period>();
   }
 };
 
