@@ -1,7 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "rpmbb/util/power.hpp"
 #include "rpmbb/util/human_readable.hpp"
+#include "rpmbb/util/power.hpp"
 
 #include <doctest/doctest.h>
 
@@ -57,4 +57,6 @@ TEST_CASE("Testing from_human function") {
   CHECK(from_human<int, 1000>("1k") == 1000);
   CHECK(from_human<float, 1000>("1.23m") == doctest::Approx(0.00123));
   CHECK(from_human<double>("1G") == doctest::Approx(1 << 30));
+  CHECK(from_human<short>("1K") == 1024);
+  CHECK(from_human<unsigned short>("32K") == (1 << 15));
 }
