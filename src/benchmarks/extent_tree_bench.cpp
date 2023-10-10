@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "rpmbb.hpp"
-#include "rpmbb/inspector/std.hpp"
+#include "rpmbb/inspector/std_containers.hpp"
 
 using ordered_json = nlohmann::ordered_json;
 

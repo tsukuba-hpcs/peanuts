@@ -138,7 +138,7 @@ TEST_CASE("inspect std::optional<T>") {
   CHECK(ss3.str() == "nullopt");
 }
 
-#include "rpmbb/inspector/chrono.hpp"
+#include "rpmbb/inspector/std_chrono.hpp"
 
 TEST_CASE("Inspect std::chrono::duration") {
   using namespace rpmbb::util;

@@ -2,7 +2,7 @@
 
 #include <doctest/doctest.h>
 #include "rpmbb/inspector.hpp"
-#include "rpmbb/inspector/std.hpp"
+#include "rpmbb/inspector/std_containers.hpp"
 
 TEST_CASE("Inspect std::array") {
     std::array<int, 3> arr = {1, 2, 3};

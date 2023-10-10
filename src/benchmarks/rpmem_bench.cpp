@@ -15,7 +15,8 @@
 #include <thread>
 #include <vector>
 #include "rpmbb.hpp"
-#include "rpmbb/inspector/std.hpp"
+#include "rpmbb/inspector/std_containers.hpp"
+#include "rpmbb/inspector/std_chrono.hpp"
 
 #include <libpmem2.h>
 #include <mpi.h>
