@@ -11,22 +11,20 @@
 namespace rpmbb::mpi {
 
 class status {
-  std::unique_ptr<MPI_Status> status_;
+  MPI_Status status_;
 
  public:
-  status() : status_(std::make_unique<MPI_Status>()) {}
-  status(const status&) = delete;
-  auto operator=(const status&) -> status& = delete;
+  status() = default;
+  status(const status&) = default;
+  auto operator=(const status&) -> status& = default;
   status(status&&) = default;
   auto operator=(status&&) -> status& = default;
-  status(const MPI_Status& status)
-      : status_(std::make_unique<MPI_Status>(status)) {}
+  status(const MPI_Status& status) : status_(status) {}
 
-  auto native() const -> const MPI_Status& { return *status_; }
-  auto native() -> MPI_Status& { return *status_; }
-
-  operator const MPI_Status&() const { return *status_; }
-  operator MPI_Status&() { return *status_; }
+  auto native() const -> const MPI_Status& { return status_; }
+  auto native() -> MPI_Status& { return status_; }
+  operator const MPI_Status&() const { return status_; }
+  operator MPI_Status&() { return status_; }
 
   auto count(const dtype& type) const -> int {
     int result;
@@ -52,4 +50,5 @@ class status {
   auto tag() const -> int { return native().MPI_TAG; }
   auto error_code() const -> int { return native().MPI_ERROR; }
 };
+
 }  // namespace rpmbb::mpi
