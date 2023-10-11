@@ -3,6 +3,7 @@
 #include "rpmbb/mpi/dtype.hpp"
 #include "rpmbb/mpi/type_traits.hpp"
 
+#include <span>
 #include <type_traits>
 
 namespace rpmbb::mpi::detail {
@@ -19,23 +20,18 @@ class container_adapter<T,
   using value_type =
       decltype(std::span(std::declval<container_type&>()))::value_type;
 
-  explicit container_adapter(container_type& container)
-      : container_(container) {}
-
-  auto to_span() -> std::span<value_type> {
-    return std::span<value_type>(container_);
+  static auto to_span(container_type& container) -> std::span<value_type> {
+    return std::span<value_type>(container);
   }
 
-  auto to_cspan() -> std::span<const value_type> {
-    return std::span<const value_type>(container_);
+  static auto to_cspan(const container_type& container)
+      -> std::span<const value_type> {
+    return std::span<const value_type>(container);
   }
 
-  auto to_dtype() -> mpi::dtype {
+  static auto to_dtype() -> mpi::dtype {
     return mpi::to_dtype<std::remove_cv_t<value_type>>();
   }
-
- private:
-  container_type& container_;
 };
 
 template <typename T>
@@ -47,22 +43,18 @@ class container_adapter<
   using container_type = std::remove_reference_t<T>;
   using value_type = container_type;
 
-  explicit container_adapter(T& container) : container_(container) {}
-
-  auto to_span() -> std::span<value_type> {
-    return std::span<value_type>{&container_, 1};
+  static auto to_span(container_type& container) -> std::span<value_type> {
+    return std::span<value_type>{&container, 1};
   }
 
-  auto to_cspan() -> std::span<const value_type> {
-    return std::span<const value_type>{&container_, 1};
+  static auto to_cspan(const container_type& container)
+      -> std::span<const value_type> {
+    return std::span<const value_type>{&container, 1};
   }
 
-  auto to_dtype() -> mpi::dtype {
+  static auto to_dtype() -> mpi::dtype {
     return mpi::to_dtype<std::remove_cv_t<value_type>>();
   }
-
- private:
-  container_type& container_;
 };
 
 }  // namespace rpmbb::mpi::detail

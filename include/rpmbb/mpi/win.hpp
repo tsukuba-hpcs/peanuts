@@ -156,14 +156,14 @@ class win {
 
   template <typename T>
   auto get(T& recv, const dtype& dtype, int target, aint disp) const -> void {
-    detail::container_adapter recv_adapter{recv};
-    get(recv_adapter.to_span(), dtype, target, disp);
+    using recv_adapter = detail::container_adapter<T>;
+    get(recv_adapter::to_span(recv), dtype, target, disp);
   }
 
   template <typename T>
   auto get(T& recv, int target, aint disp) const -> void {
-    auto recv_adapter = detail::container_adapter<T>{recv};
-    get(recv_adapter.to_span(), recv_adapter.to_dtype(), target, disp);
+    using recv_adapter = detail::container_adapter<T>;
+    get(recv_adapter::to_span(recv), recv_adapter::to_dtype(), target, disp);
   }
   
 };

@@ -89,16 +89,16 @@ class comm {
                   const dtype& send_dtype,
                   std::span<U> recv_data,
                   const dtype& recv_dtype) const {
-    auto send_adapter =
-        detail::container_adapter<decltype(send_data)>{send_data};
-    all_gather(send_adapter.to_cspan(), send_dtype, recv_data, recv_dtype);
+    using send_adapter = detail::container_adapter<const T>;
+    all_gather(send_adapter::to_cspan(send_data), send_dtype, recv_data,
+               recv_dtype);
   }
 
   template <typename T, typename U>
   void all_gather(const T& send_data, std::span<U> recv_data) const {
-    auto send_adapter = detail::container_adapter<const T>{send_data};
-    all_gather(send_adapter.to_cspan(), send_adapter.to_dtype(), recv_data,
-               mpi::to_dtype<std::remove_cv_t<U>>());
+    using send_adapter = detail::container_adapter<const T>;
+    all_gather(send_adapter::to_cspan(send_data), send_adapter::to_dtype(),
+               recv_data, mpi::to_dtype<std::remove_cv_t<U>>());
   }
 
   template <typename T>
@@ -117,14 +117,14 @@ class comm {
 
   template <typename T>
   void broadcast(T& send_recv_data, const dtype& dtype, int root = 0) const {
-    auto adapter = detail::container_adapter<T>{send_recv_data};
-    broadcast(adapter.to_span(), dtype, root);
+    using adapter = detail::container_adapter<T>;
+    broadcast(adapter::to_span(send_recv_data), dtype, root);
   }
 
   template <typename T>
   void broadcast(T& send_recv_data, int root = 0) const {
-    auto adapter = detail::container_adapter<T>{send_recv_data};
-    broadcast(adapter.to_span(), adapter.to_dtype(), root);
+    using adapter = detail::container_adapter<T>;
+    broadcast(adapter::to_span(send_recv_data), adapter::to_dtype(), root);
   }
 
   // sendrecv
@@ -153,11 +153,12 @@ class comm {
                     U& recv_data,
                     const int recv_rank = MPI_ANY_SOURCE,
                     const int recv_tag = MPI_ANY_TAG) const -> status {
-    auto send_adapter = detail::container_adapter<const T>{send_data};
-    auto recv_adapter = detail::container_adapter<U>{recv_data};
-    return send_receive(send_adapter.to_cspan(), send_adapter.to_dtype(),
-                        send_rank, send_tag, recv_adapter.to_span(),
-                        recv_adapter.to_dtype(), recv_rank, recv_tag);
+    using send_adapter = detail::container_adapter<const T>;
+    using recv_adapter = detail::container_adapter<U>;
+    return send_receive(send_adapter::to_cspan(send_data),
+                        send_adapter::to_dtype(), send_rank, send_tag,
+                        recv_adapter::to_span(recv_data),
+                        recv_adapter::to_dtype(), recv_rank, recv_tag);
   }
 };
 
