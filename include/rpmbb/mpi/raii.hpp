@@ -49,6 +49,11 @@ struct dtype_deleter {
   void operator()(pointer dtype) const { MPI_Type_free(&dtype.native); }
 };
 
+struct request_deleter {
+  using pointer = native_handle<MPI_Request, MPI_REQUEST_NULL>;
+  void operator()(pointer request) const { MPI_Request_free(&request.native); }
+};
+
 }  // namespace detail
 
 using unique_env = std::unique_ptr<void, detail::env_deleter>;
@@ -58,5 +63,6 @@ using unique_win = std::unique_ptr<void, detail::win_deleter>;
 using unique_info = std::unique_ptr<void, detail::info_deleter>;
 using unique_dtype =
     std::unique_ptr<void, util::cond_deleter<detail::dtype_deleter>>;
+using unique_request = std::unique_ptr<void, util::cond_deleter<detail::request_deleter>>;
 
 }  // namespace rpmbb::mpi::raii
