@@ -27,6 +27,22 @@ class win {
     MPI_CHECK_ERROR_CODE(MPI_Win_create_dynamic(info, comm, &win));
     win_.reset(win);
   }
+  win(const comm& comm,
+      void* base,
+      aint size,
+      int disp_unit = 1,
+      const info& info = MPI_INFO_NULL) {
+    MPI_Win win;
+    MPI_CHECK_ERROR_CODE(
+        MPI_Win_create(base, size, disp_unit, info, comm, &win));
+    win_.reset(win);
+  }
+  win(const comm& comm, void* base, aint size, const info& info = MPI_INFO_NULL)
+      : win{comm, base, size, 1, info} {}
+  win(const comm& comm,
+      std::span<std::byte> buf,
+      const info& info = MPI_INFO_NULL)
+      : win{comm, buf.data(), static_cast<MPI_Aint>(buf.size()), 1, info} {}
 
   operator MPI_Win() const { return native(); }
   auto native() const -> MPI_Win { return win_.get().native; }
@@ -165,7 +181,6 @@ class win {
     using recv_adapter = detail::container_adapter<T>;
     get(recv_adapter::to_span(recv), recv_adapter::to_dtype(), target, disp);
   }
-  
 };
 
 class win_lock_all_adapter {
