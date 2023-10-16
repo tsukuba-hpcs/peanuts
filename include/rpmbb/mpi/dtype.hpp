@@ -2,7 +2,7 @@
 
 #include "rpmbb/mpi/error.hpp"
 #include "rpmbb/mpi/raii.hpp"
-#include "rpmbb/util/singleton.hpp"
+#include "rpmbb/utils/singleton.hpp"
 
 #include <mpi.h>
 #include <tuple>

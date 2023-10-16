@@ -1,7 +1,7 @@
 #pragma once
 #include <chrono>
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 
 template <typename Clock = std::chrono::high_resolution_clock,
           typename Rep = typename Clock::rep,
@@ -51,4 +51,4 @@ template <typename Rep = double, typename Period = std::ratio<1, 1>>
 using stopwatch =
     basic_stopwatch<std::chrono::high_resolution_clock, Rep, Period>;
 
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils

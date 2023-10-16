@@ -15,8 +15,8 @@
 #include <thread>
 #include <vector>
 #include "rpmbb.hpp"
-#include "rpmbb/inspector/std_containers.hpp"
 #include "rpmbb/inspector/std_chrono.hpp"
+#include "rpmbb/inspector/std_containers.hpp"
 
 #include <libpmem2.h>
 #include <mpi.h>
@@ -24,8 +24,18 @@
 using ordered_json = nlohmann::ordered_json;
 
 struct bench_stats {
-  rpmbb::util::welford wf;
-  uint64_t elapsed_cycles;
+  rpmbb::utils::stopwatch<>::duration elapsed_time;
+  size_t total_num_ops;
+  size_t total_transfer_size;
+
+  std::ostream& inspect(std::ostream& os) const {
+    os << rpmbb::utils::make_inspector(elapsed_time) << ", ";
+    os << rpmbb::utils::to_human<1000>(total_num_ops / elapsed_time.count())
+       << "ops/sec, ";
+    os << rpmbb::utils::to_human(total_transfer_size / elapsed_time.count())
+       << "iB/s";
+    return os;
+  }
 };
 
 namespace nlohmann {
@@ -38,35 +48,21 @@ struct adl_serializer<std::chrono::duration<Rep, Period>> {
 };
 
 template <>
-struct adl_serializer<rpmbb::util::welford> {
-  static void to_json(ordered_json& j,
-                      const rpmbb::util::welford& welford) {
+struct adl_serializer<rpmbb::utils::welford> {
+  static void to_json(ordered_json& j, const rpmbb::utils::welford& welford) {
     j["n"] = welford.n();
-    // j["mean"] = rpmbb::util::tsc::to_nsec(welford.mean());
-    // j["var"] = rpmbb::util::tsc::to_nsec(welford.var());
-    // j["std"] = rpmbb::util::tsc::to_nsec(welford.std());
+    // j["mean"] = rpmbb::utils::tsc::to_nsec(welford.mean());
+    // j["var"] = rpmbb::utils::tsc::to_nsec(welford.var());
+    // j["std"] = rpmbb::utils::tsc::to_nsec(welford.std());
     j["mean"] = welford.mean();
     j["var"] = welford.var();
     j["std"] = welford.std();
   }
 };
 
-template <>
-struct adl_serializer<bench_stats> {
-  static void to_json(ordered_json& j, const bench_stats& stats) {
-    j["elapsed_cycles"] = stats.elapsed_cycles;
-    j["ops_per_sec"] =
-        stats.wf.n() / rpmbb::util::tsc::to_msec(stats.elapsed_cycles) * 1000;
-    j["n"] = stats.wf.n();
-    j["mean"] = stats.wf.mean();
-    j["var"] = stats.wf.var();
-    j["std"] = stats.wf.std();
-  }
-};
-
 }  // namespace nlohmann
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 std::ostream& inspect(std::ostream& os, const welford& wf) {
   os << "{n:" << wf.n() << ',';
   os << "mean:" << wf.mean() << ',';
@@ -74,7 +70,7 @@ std::ostream& inspect(std::ostream& os, const welford& wf) {
   os << "std:" << wf.std() << '}';
   return os;
 }
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils
 
 class memory_usage {
  public:
@@ -96,83 +92,55 @@ class memory_usage {
   }
 };
 
-class time_window {
- private:
-  uint64_t t_window_start_;
-  uint64_t t_prev_;
-  uint64_t t_now_;
-  uint64_t window_cycles_;
-  rpmbb::util::welford& wf_;
+constexpr size_t hugepage_size = 2 * 1024 * 1024;  // 2MiB
 
- public:
-  time_window(uint64_t window_cycles, rpmbb::util::welford& wf)
-      : t_window_start_(rpmbb::util::tsc::get()),
-        t_prev_(t_window_start_),
-        t_now_(t_window_start_),
-        window_cycles_(window_cycles),
-        wf_(wf) {}
+size_t align_down_to_hugepage(size_t size) {
+  return (size / hugepage_size) * hugepage_size;
+}
 
-  void update_time() { t_now_ = rpmbb::util::tsc::get(); }
+struct process_map_entry {
+  int inter_rank;
+  int intra_rank;
 
-  auto elapsed_cycles() const -> uint64_t { return t_now_ - t_window_start_; }
-
-  bool should_reset_window() {
-    if (elapsed_cycles() > window_cycles_) {
-      t_window_start_ = t_now_;
-      return true;
-    }
-    return false;
+  bool operator<(const process_map_entry& other) const {
+    return std::tie(inter_rank, intra_rank) <
+           std::tie(other.inter_rank, other.intra_rank);
   }
 
-  void update_welford() {
-    wf_.add(t_now_ - t_prev_);
-    t_prev_ = t_now_;
+  std::ostream& inspect(std::ostream& os) const {
+    os << "{intra_rank:" << intra_rank << ",inter_rank:" << inter_rank << "}";
+    return os;
   }
-
-  auto get_window_start() const -> uint64_t { return t_window_start_; }
 };
 
-std::vector<bench_stats> aggregate_status_in_same_window(
-    std::vector<std::vector<bench_stats>>& bench_stats_per_thread) {
-  std::vector<bench_stats> result;
-
-  // bench_status_per_thread[thread_id][window_id]
-  size_t window_id = 0;
-  bool remain = true;
-  while (remain) {
-    uint64_t max_cycles = 0;
-    remain = false;
-    std::vector<rpmbb::util::welford> welfords;
-    for (auto& stats_in_a_thread : bench_stats_per_thread) {
-      if (window_id < stats_in_a_thread.size()) {
-        welfords.push_back(stats_in_a_thread[window_id].wf);
-        max_cycles =
-            std::max(max_cycles, stats_in_a_thread[window_id].elapsed_cycles);
-        remain = true;
-      }
-    }
-    if (remain) {
-      result.push_back({rpmbb::util::welford::from_range(
-                            welfords.begin(), welfords.end()),
-                        max_cycles});
-    }
-    ++window_id;
+auto create_inverted_process_map(
+    const std::vector<process_map_entry>& process_map)
+    -> std::map<process_map_entry, int> {
+  std::map<process_map_entry, int> inverted_map;
+  for (const auto& [global_rank, entry] :
+       rpmbb::utils::cenumerate(process_map)) {
+    inverted_map[process_map[global_rank]] = global_rank;
   }
+  return inverted_map;
+}
 
-  return result;
+auto to_string(std::span<const std::byte> span) -> std::string {
+  std::string str;
+  str.reserve(span.size());
+  std::transform(span.begin(), span.end(), std::back_inserter(str),
+                 [](std::byte b) { return static_cast<char>(b); });
+  return str;
 }
 
 auto main(int argc, char* argv[]) -> int try {
   using namespace rpmbb;
-  rpmbb::mpi::env env(&argc, &argv);
-  cxxopts::Options options("rpmem_bench",
-                           "MPI_Fetch_and_op + lipmem2 benchmark");
+  mpi::env env(&argc, &argv);
+  cxxopts::Options options("rpmem_bench", "MPI_Get + lipmem2 benchmark");
   // clang-format off
   options.add_options()
     ("h,help", "Print usage")
     ("V,version", "Print version")
     ("prettify", "Prettify output")
-    ("w,window", "OP/window in msec", cxxopts::value<uint64_t>()->default_value("1000"))
     ("p,path", "path to pmem device", cxxopts::value<std::string>()->default_value("/dev/dax0.0"))
     ("t,transfer", "transfer size", cxxopts::value<size_t>()->default_value("256"))
     ("b,block", "block size - contiguous bytes to write per task", cxxopts::value<size_t>()->default_value("1073741824"))
@@ -190,48 +158,40 @@ auto main(int argc, char* argv[]) -> int try {
     return 0;
   }
 
-  rpmbb::util::tsc::calibrate();
+  // utils::tsc::calibrate();
 
-  const auto window = parsed["window"].as<uint64_t>();
-  // const auto window_cycles = rpmbb::util::tsc::cycles_per_msec() * window;
   const auto transfer_size = parsed["transfer"].as<size_t>();
   const auto block_size = parsed["block"].as<size_t>();
+
+  assert(block_size % transfer_size == 0);
+
+  const auto& comm = mpi::comm::world();
+  auto intra_comm = mpi::comm{comm, mpi::split_type::shared};
+  auto inter_comm = mpi::comm{comm, intra_comm.rank()};
 
   ordered_json bench_result = {
       {"version", RPMBB_VERSION},
       {"timestamp", fmt::format("{:%FT%TZ}", std::chrono::system_clock::now())},
-      {"cycles_per_msec", rpmbb::util::tsc::cycles_per_msec()},
-      {"window", window},
+      // {"cycles_per_msec", utils::tsc::cycles_per_msec()},
       {"transfer_size", transfer_size},
       {"block_size", block_size},
+      {"np", comm.size()},
+      {"ppn", intra_comm.size()},
+      {"nnodes", inter_comm.size()},
   };
 
-  assert(block_size % transfer_size == 0);
-
-  const auto& comm = rpmbb::mpi::comm::world();
-  auto intra_comm = mpi::comm{comm, mpi::split_type::shared};
-  auto inter_comm = mpi::comm{comm, intra_comm.rank()};
-
-  struct process_map_entry {
-    int intra_rank;
-    int inter_rank;
-    std::ostream& inspect(std::ostream& os) const {
-      os << "{intra_rank:" << intra_rank << ",inter_rank:" << inter_rank << "}";
-      return os;
-    }
-  };
   std::vector<process_map_entry> process_map(comm.size());
   {
     mpi::dtype process_map_entry_dtype = mpi::dtype{mpi::to_dtype<int>(), 2};
     process_map_entry_dtype.commit();
-    const auto entry = process_map_entry{intra_comm.rank(), inter_comm.rank()};
+    const auto entry = process_map_entry{inter_comm.rank(), intra_comm.rank()};
     comm.all_gather(entry, process_map_entry_dtype, std::span{process_map},
                     process_map_entry_dtype);
   }
   int shift_unit = -1;
   if (comm.rank() == 0) {
     // find first process that is not in the same node
-    for (const auto& [idx, entry] : util::cenumerate(process_map)) {
+    for (const auto& [idx, entry] : utils::cenumerate(process_map)) {
       if (entry.inter_rank != 0) {
         shift_unit = idx;
         break;
@@ -245,115 +205,154 @@ auto main(int argc, char* argv[]) -> int try {
   comm.broadcast(shift_unit);
   // fmt::print("shft_unit: {}, my_rank: {}\n", shift_unit, comm.rank());
 
-  // std::cout << rpmbb::util::make_inspector(process_map) << std::endl;
+  auto inverted_process_map = create_inverted_process_map(process_map);
 
-  auto device = rpmbb::pmem2::device{parsed["path"].as<std::string>()};
+  // std::cout << utils::make_inspector(process_map) << std::endl;
+
+  auto device = pmem2::device{parsed["path"].as<std::string>()};
   if (!device.is_devdax()) {
     device.truncate(block_size * intra_comm.size());
   }
-  auto source = rpmbb::pmem2::source{device};
-  auto config = rpmbb::pmem2::config{PMEM2_GRANULARITY_PAGE};
-  auto map = rpmbb::pmem2::map{source, config};
+  auto source = pmem2::source{device};
+  auto config = pmem2::config{PMEM2_GRANULARITY_PAGE};
+  auto map = pmem2::map{source, config};
 
-  auto disp = intra_comm.rank() * block_size;
-  auto my_block_span = map.as_span().subspan(disp, block_size);
+  // auto disp = intra_comm.rank() * block_size;
+  auto register_size = align_down_to_hugepage(map.size() / intra_comm.size());
+  auto disp = intra_comm.rank() * register_size;
+  // auto my_memory_block =
+  //     std::unique_ptr<void, decltype(&mpi::free<void>)>{
+  //         mpi::allocate(block_size), &mpi::free<void>};
+  // auto my_block_span = std::span{
+  //     reinterpret_cast<std::byte*>(my_memory_block.get()), block_size};
+  // auto my_block_span = map.as_span().subspan(disp, block_size);
+  auto my_block_span = map.as_span().subspan(disp, register_size);
 
   // bench_result["pmem_addr"] = fmt::format("{}",
   // fmt::ptr(my_block_span.data()));
   bench_result["pmem_size"] = map.size();
   bench_result["pmem_store_granularity"] = map.store_granularity();
 
-  auto ops = rpmbb::pmem2::file_operations(map);
+  auto ops = pmem2::file_operations(map);
 
-  auto win = mpi::win{comm};
-  win.attach(my_block_span);
+  auto sw_milli = utils::stopwatch<double, std::milli>{};
+  mpi::win win;
+  if (intra_comm.rank() == 0) {
+    win = mpi::win{comm, map.as_span()};
+  } else {
+    win = mpi::win{comm, std::span<std::byte>{}};
+  }
+  mpi::run_on_rank0([&] {
+    std::cout << "create win: "
+              << utils::make_inspector(sw_milli.get_and_reset()) << std::endl;
+  });
+  // win.attach(my_block_span);
   auto adapter = mpi::win_lock_all_adapter{win, MPI_MODE_NOCHECK};
   auto lock = std::unique_lock{adapter};
+  mpi::run_on_rank0([&] {
+    std::cout << "win_lock_all: "
+              << utils::make_inspector(sw_milli.get_and_reset()) << std::endl;
+  });
 
-  // const auto random_data_buffer =
-  //     util::generate_random_alphanumeric_string(transfer_size);
   const auto random_data_buffer =
-      std::string(transfer_size, std::to_string(comm.rank())[0]);
+      utils::generate_random_alphanumeric_string(transfer_size);
+  // const auto random_data_buffer =
+  //     std::string(transfer_size, std::to_string(comm.rank())[0]);
   auto xfer_buffer = std::vector<std::byte>(transfer_size);
 
   // write
-  auto disp_aint = mpi::aint{my_block_span.data()};
+  // auto disp_aint = mpi::aint{my_block_span.data()};
 
-  std::vector<mpi::aint> disps(comm.size());
-  comm.all_gather(disp_aint, std::span{disps});
+  // std::vector<mpi::aint> disps(comm.size());
+  // comm.all_gather(disp_aint, std::span{disps});
 
-  auto wf_write = rpmbb::util::welford{};
-  auto wf_read = rpmbb::util::welford{};
-  auto sw = rpmbb::util::stopwatch<double, std::ratio<1, 1>>{};
+  auto wf_write = utils::welford{};
+  auto wf_read = utils::welford{};
+
+  comm.barrier();
+  auto sw = utils::stopwatch<double>{};
   for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
     ops.pwrite_nt(std::as_bytes(std::span{random_data_buffer}), disp + ofs);
     wf_write.add(sw.lap_time().count());
   }
+  comm.barrier();
+  auto write_elapsed_time_sec = sw.get().count();
 
   win.sync();
   comm.barrier();
-  win.sync();
-
-  // read neighbor node's data
-  auto target_rank = (comm.rank() + shift_unit) % comm.size();
-  auto target_disp = disps[target_rank];
+  auto target_rank =
+      inverted_process_map[{(inter_comm.rank() + 1) % inter_comm.size(), 0}];
+  // auto target_rank = (comm.ran k() + shift_unit) % comm.size();
+  auto target_disp = (intra_comm.rank() * register_size);
+  // auto target_disp = disps[target_rank];
   // fmt::print("my_rank: {}, target_rank: {}, target_disp: {}\n", comm.rank(),
   //            target_rank, target_disp.native());
 
-  sw.reset();
+  sw_milli.reset();
+  // warm up
   for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
-    win.get(xfer_buffer, target_rank,
-            target_disp + mpi::aint{static_cast<MPI_Aint>(ofs)});
+    win.get(xfer_buffer, target_rank, static_cast<MPI_Aint>(target_disp + ofs));
+  }
+  win.flush(target_rank);
+
+  mpi::run_on_rank0([&] {
+    std::cout << "warm up: " << utils::make_inspector(sw_milli.get_and_reset())
+              << std::endl;
+  });
+
+  comm.barrier();
+  sw.reset();
+  comm.barrier();
+
+  for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
+    // MPI_Get(&xfer_buffer[0], xfer_buffer.size(), MPI_BYTE, target_rank,
+    //         target_disp + mpi::aint{ofs}, xfer_buffer.size(), MPI_BYTE, win);
+    // MPI_Win_flush(target_rank, win);
+    win.get(xfer_buffer, target_rank, static_cast<MPI_Aint>(target_disp + ofs));
     win.flush(target_rank);
-    wf_read.add(sw.lap_time().count());
+    // wf_read.add(sw.lap_time().count());
+  }
+  // win.flush(target_rank);
+
+  comm.barrier();
+  auto read_elapsed_time = sw.get();
+  // auto read_elapsed_time = sw.get();
+
+  if (comm.rank() == 0) {
+    auto total_nops = comm.size() * block_size / transfer_size;
+    std::cout << utils::make_inspector(bench_stats{
+                     read_elapsed_time,
+                     total_nops,
+                     comm.size() * block_size,
+                 })
+              << std::endl;
   }
 
   // verify xfer_buffer == neighbor's random_data_buffer
   auto neighbor_random_data_buffer = std::vector<std::byte>(transfer_size);
   comm.send_receive(random_data_buffer,
                     (comm.rank() + (comm.size() - shift_unit)) % comm.size(), 0,
-                    neighbor_random_data_buffer, target_rank);
+                    neighbor_random_data_buffer);
   if (!std::equal(xfer_buffer.begin(), xfer_buffer.end(),
                   neighbor_random_data_buffer.begin(),
                   neighbor_random_data_buffer.end())) {
     fmt::print(stderr,
                "Error: xfer_buffer != neighbor_random_data_buffer on rank {}\n",
                comm.rank());
-    // if (comm.rank() == 0) {
-    //   std::string str;
-    //   str.reserve(xfer_buffer.size());
-    //   std::transform(xfer_buffer.begin(), xfer_buffer.end(),
-    //                  std::back_inserter(str),
-    //                  [](std::byte b) { return static_cast<char>(b); });
-
-    //   fmt::print(stderr, "xfer_buffer: {}\n", str);
-    //   str.clear();
-    //   std::transform(neighbor_random_data_buffer.begin(),
-    //                  neighbor_random_data_buffer.end(),
-    //                  std::back_inserter(str),
-    //                  [](std::byte b) { return static_cast<char>(b); });
-
-    //   fmt::print(stderr, "neighbor_random_data_buffer: {}\n", str);
-    //   fmt::print(stderr, "my_random_data_buffer: {}\n", random_data_buffer);
-    // }
-    return 1;
+    fmt::print(stderr, "{}: write={}, read={}, expected_read={}\n", comm.rank(),
+               random_data_buffer, to_string(xfer_buffer),
+               to_string(neighbor_random_data_buffer));
   }
 
-  if (comm.rank() == 0) {
-    auto func_summary = [](size_t np, size_t n, double mean,
-                           size_t transfer_size) {
-      auto total_nops = n * np;
-      auto elapsed_time_sec = mean * n;
-      auto ops_per_sec = total_nops / elapsed_time_sec;
-      auto bytes_per_sec = total_nops * transfer_size / elapsed_time_sec;
-      return std::tie(total_nops, elapsed_time_sec, ops_per_sec, bytes_per_sec);
-    };
+  comm.barrier();
+
+  if (comm.rank() == 9999) {
     {
-      auto [total_nops, elapsed_time_sec, ops_per_sec, bytes_per_sec] =
-          func_summary(comm.size(), wf_write.n(), wf_write.mean(),
-                       transfer_size);
+      auto total_num_of_ops = wf_write.n() * comm.size();
+      auto ops_per_sec = total_num_of_ops / write_elapsed_time_sec;
+      auto bytes_per_sec = ops_per_sec * transfer_size;
       bench_result["write"] = {
-          {"elapsed_time_sec", elapsed_time_sec},
+          {"elapsed_time_sec", write_elapsed_time_sec},
           {"ops_per_sec", ops_per_sec},
           {"bytes_per_sec", bytes_per_sec},
           {"gbytes_per_sec", bytes_per_sec / (1 << 30)},
@@ -365,17 +364,19 @@ auto main(int argc, char* argv[]) -> int try {
     }
 
     {
-      auto [total_nops, elapsed_time_sec, ops_per_sec, bytes_per_sec] =
-          func_summary(comm.size(), wf_read.n(), wf_read.mean(), transfer_size);
+      //auto total_num_of_ops = wf_read.n() * comm.size();
+      auto total_num_of_ops = (block_size / transfer_size) * comm.size();
+      auto ops_per_sec = total_num_of_ops / read_elapsed_time.count();
+      auto bytes_per_sec = ops_per_sec * transfer_size;
       bench_result["read"] = {
-          {"elapsed_time_sec", elapsed_time_sec},
+          {"elapsed_time_sec", read_elapsed_time.count()},
           {"ops_per_sec", ops_per_sec},
           {"bytes_per_sec", bytes_per_sec},
           {"gbytes_per_sec", bytes_per_sec / (1 << 30)},
-          {"nops_per_proc", wf_read.n()},
-          {"mean", wf_read.mean()},
-          {"var", wf_read.var()},
-          {"std", wf_read.std()},
+          // {"nops_per_proc", wf_read.n()},
+          // {"mean", wf_read.mean()},
+          // {"var", wf_read.var()},
+          // {"std", wf_read.std()},
       };
     }
 
@@ -384,6 +385,13 @@ auto main(int argc, char* argv[]) -> int try {
     }
     std::cout << bench_result << std::endl;
   }
+
+  sw_milli.reset();
+  lock.unlock();
+  mpi::run_on_rank0([&] {
+    std::cout << "win_unlock_all: "
+              << utils::make_inspector(sw_milli.get_and_reset()) << std::endl;
+  });
 
   return 0;
 } catch (const rpmbb::mpi::mpi_error& e) {

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 
 template <uintmax_t base, unsigned int exp>
 constexpr auto power() -> uintmax_t {
@@ -21,4 +21,4 @@ constexpr auto power() -> uintmax_t {
   }
 }
 
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils

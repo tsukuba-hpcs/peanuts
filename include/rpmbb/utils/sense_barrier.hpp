@@ -4,7 +4,7 @@
 
 #include "tls.hpp"
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 
 class sense_barrier {
   sense_barrier() = delete;
@@ -36,4 +36,4 @@ class sense_barrier {
   thread_local_value<bool> tl_sense_;
 };
 
-}  // namespace rpmbb
+}  // namespace rpmbb::utils

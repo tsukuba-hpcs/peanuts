@@ -1,14 +1,14 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#include "rpmbb/util/stopwatch.hpp"
+#include "rpmbb/utils/stopwatch.hpp"
 #include <doctest/doctest.h>
 
 #include <thread>
 
 TEST_CASE_TEMPLATE("Generic Stopwatch Test",
                    T,
-                   rpmbb::util::stopwatch<double, std::nano>,
-                   rpmbb::util::stopwatch<uint64_t, std::milli>,
-                   rpmbb::util::stopwatch<>) {
+                   rpmbb::utils::stopwatch<double, std::nano>,
+                   rpmbb::utils::stopwatch<uint64_t, std::milli>,
+                   rpmbb::utils::stopwatch<>) {
   using namespace std::chrono_literals;
   T sw;
 

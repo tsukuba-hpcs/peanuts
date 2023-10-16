@@ -5,7 +5,7 @@
 #include <sstream>
 #include <type_traits>
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 
 template <typename T>
 struct inspector {
@@ -73,4 +73,4 @@ std::string to_string(const T& obj) {
   return ss.str();
 }
 
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils

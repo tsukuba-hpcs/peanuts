@@ -30,7 +30,7 @@ class intrusive_with_non_intrusive {
 
  public:
   std::ostream& inspect(std::ostream& os) const {
-    return os << "(" << rpmbb::util::make_inspector(nic) << ")";
+    return os << "(" << rpmbb::utils::make_inspector(nic) << ")";
   }
 };
 
@@ -44,7 +44,7 @@ std::ostream& inspect(std::ostream& os, const non_intrusive_class& obj) {
 
 std::ostream& inspect(std::ostream& os,
                       const non_intrusive_with_intrusive& obj) {
-  return os << "(" << rpmbb::util::make_inspector(obj.ic) << ")";
+  return os << "(" << rpmbb::utils::make_inspector(obj.ic) << ")";
 }
 
 }  // namespace user_defined_ns
@@ -52,68 +52,68 @@ std::ostream& inspect(std::ostream& os,
 TEST_CASE("Inspect intrusive_class") {
   user_defined_ns::intrusive_class obj;
   std::stringstream ss;
-  ss << rpmbb::util::make_inspector(obj);
+  ss << rpmbb::utils::make_inspector(obj);
   CHECK(ss.str() == "0-10");
 }
 
 TEST_CASE("Inspect non_intrusive_class") {
   user_defined_ns::non_intrusive_class obj;
   std::stringstream ss;
-  ss << rpmbb::util::make_inspector(obj);
+  ss << rpmbb::utils::make_inspector(obj);
   CHECK(ss.str() == "5,10");
 }
 
 TEST_CASE("Inspect non_intrusive_with_intrusive") {
   user_defined_ns::non_intrusive_with_intrusive obj;
   std::stringstream ss;
-  ss << rpmbb::util::make_inspector(obj);
+  ss << rpmbb::utils::make_inspector(obj);
   CHECK(ss.str() == "(0-10)");
 }
 
 TEST_CASE("Inspect intrusive_with_non_intrusive") {
   user_defined_ns::intrusive_with_non_intrusive obj;
   std::stringstream ss;
-  ss << rpmbb::util::make_inspector(obj);
+  ss << rpmbb::utils::make_inspector(obj);
   CHECK(ss.str() == "(5,10)");
 }
 
 TEST_CASE("to_string with intrusive_class") {
   user_defined_ns::intrusive_class obj;
-  CHECK(rpmbb::util::to_string(obj) == "0-10");
+  CHECK(rpmbb::utils::to_string(obj) == "0-10");
 }
 
 TEST_CASE("to_string with non_intrusive_class") {
   user_defined_ns::non_intrusive_class obj;
-  CHECK(rpmbb::util::to_string(obj) == "5,10");
+  CHECK(rpmbb::utils::to_string(obj) == "5,10");
 }
 
 TEST_CASE("to_string with non_intrusive_with_intrusive") {
   user_defined_ns::non_intrusive_with_intrusive obj;
-  CHECK(rpmbb::util::to_string(obj) == "(0-10)");
+  CHECK(rpmbb::utils::to_string(obj) == "(0-10)");
 }
 
 TEST_CASE("to_string with intrusive_with_non_intrusive") {
   user_defined_ns::intrusive_with_non_intrusive obj;
-  CHECK(rpmbb::util::to_string(obj) == "(5,10)");
+  CHECK(rpmbb::utils::to_string(obj) == "(5,10)");
 }
 
 TEST_CASE("inspect std::optional<T>") {
   std::optional<int> obj;
   {
     std::stringstream ss;
-    ss << rpmbb::util::make_inspector(obj);
+    ss << rpmbb::utils::make_inspector(obj);
     CHECK(ss.str() == "nullopt");
   }
   obj = int{10};
   {
     std::stringstream ss;
-    ss << rpmbb::util::make_inspector(obj);
+    ss << rpmbb::utils::make_inspector(obj);
     CHECK(ss.str() == "10");
   }
 }
 
 // Specialization for std::optional<T>
-namespace rpmbb::util {
+namespace rpmbb::utils {
 template <typename T>
 struct inspector<std::optional<T>> {
   static std::ostream& inspect(std::ostream& os, const std::optional<T>& obj) {
@@ -124,24 +124,24 @@ struct inspector<std::optional<T>> {
     }
   }
 };
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils
 
 TEST_CASE("inspect std::optional<T>") {
   std::optional<int> a = 10;
   std::stringstream ss2;
-  ss2 << rpmbb::util::make_inspector(a);
+  ss2 << rpmbb::utils::make_inspector(a);
   CHECK(ss2.str() == "10");
 
   std::optional<int> b = std::nullopt;
   std::stringstream ss3;
-  ss3 << rpmbb::util::make_inspector(b);
+  ss3 << rpmbb::utils::make_inspector(b);
   CHECK(ss3.str() == "nullopt");
 }
 
 #include "rpmbb/inspector/std_chrono.hpp"
 
 TEST_CASE("Inspect std::chrono::duration") {
-  using namespace rpmbb::util;
+  using namespace rpmbb::utils;
   SUBCASE("Inspect integral rep") {
     std::ostringstream os;
     std::chrono::years years(1);

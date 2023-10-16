@@ -3,5 +3,5 @@
 #include "rpmbb/inspector.hpp"
 #include "rpmbb/mpi.hpp"
 #include "rpmbb/pmem2.hpp"
-#include "rpmbb/util.hpp"
+#include "rpmbb/utils.hpp"
 #include "rpmbb/version.h"

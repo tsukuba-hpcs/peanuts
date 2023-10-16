@@ -1,13 +1,13 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "rpmbb/util/welford.hpp"
+#include "rpmbb/utils/welford.hpp"
 #include <doctest/doctest.h>
 
 #include <algorithm>
 #include <random>
 #include <vector>
 
-using namespace rpmbb::util;
+using namespace rpmbb::utils;
 
 TEST_CASE("Welford mean variance and std test") {
   welford stats;
@@ -63,7 +63,7 @@ TEST_CASE("Test from_range method in welford class") {
 }
 
 TEST_CASE("welford") {
-  rpmbb::util::welford wf;
+  rpmbb::utils::welford wf;
   wf.add(1.0);
   wf.add(2.0);
   wf.add(3.0);

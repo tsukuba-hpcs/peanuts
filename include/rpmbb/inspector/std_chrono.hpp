@@ -6,7 +6,7 @@
 
 #include "../inspector.hpp"
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 
 template <typename Period>
 std::string get_duration_unit() {
@@ -45,4 +45,4 @@ struct inspector<std::chrono::duration<Rep, Period>> {
   }
 };
 
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils

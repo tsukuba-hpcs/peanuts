@@ -11,4 +11,5 @@
 #include "rpmbb/mpi/status.hpp"
 #include "rpmbb/mpi/type_traits.hpp"
 #include "rpmbb/mpi/type.hpp"
+#include "rpmbb/mpi/utils.hpp"
 #include "rpmbb/mpi/win.hpp"

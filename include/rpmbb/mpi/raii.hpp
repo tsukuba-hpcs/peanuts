@@ -4,7 +4,7 @@
 #include <memory>
 
 #include "rpmbb/mpi/error.hpp"
-#include "rpmbb/util/cond_deleter.hpp"
+#include "rpmbb/utils/cond_deleter.hpp"
 
 namespace rpmbb::mpi::raii {
 namespace detail {
@@ -58,11 +58,11 @@ struct request_deleter {
 
 using unique_env = std::unique_ptr<void, detail::env_deleter>;
 using unique_comm =
-    std::unique_ptr<void, util::cond_deleter<detail::comm_deleter>>;
+    std::unique_ptr<void, utils::cond_deleter<detail::comm_deleter>>;
 using unique_win = std::unique_ptr<void, detail::win_deleter>;
 using unique_info = std::unique_ptr<void, detail::info_deleter>;
 using unique_dtype =
-    std::unique_ptr<void, util::cond_deleter<detail::dtype_deleter>>;
-using unique_request = std::unique_ptr<void, util::cond_deleter<detail::request_deleter>>;
+    std::unique_ptr<void, utils::cond_deleter<detail::dtype_deleter>>;
+using unique_request = std::unique_ptr<void, utils::cond_deleter<detail::request_deleter>>;
 
 }  // namespace rpmbb::mpi::raii

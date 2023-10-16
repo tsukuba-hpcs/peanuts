@@ -8,7 +8,7 @@
 #include <sched.h>
 #include <system_error>
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 
 class cpu_affinity_manager {
  public:
@@ -58,4 +58,4 @@ class cpu_affinity_manager {
   unsigned int cpu_id_;
 };
 
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils

@@ -3,7 +3,7 @@
 #include <functional>
 #include <memory>
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 
 template <typename Deleter>
 class cond_deleter {
@@ -26,4 +26,4 @@ class cond_deleter {
   Deleter deleter_;
 };
 
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils

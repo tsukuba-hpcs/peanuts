@@ -7,7 +7,7 @@
 #include <random>
 #include <string>
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 
 template <typename T = std::mt19937>
 inline auto random_generator() -> T {
@@ -33,4 +33,4 @@ inline auto generate_random_alphanumeric_string(std::size_t len)
   return result;
 }
 
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils

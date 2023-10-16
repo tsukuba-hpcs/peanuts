@@ -14,12 +14,12 @@
 #include <stack>
 #include <unordered_map>
 #include <unordered_set>
-#include <utility>  // for std::pair
+#include <utility>
 #include <vector>
 
 #include "../inspector.hpp"
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 namespace detail {
 
 template <typename Iter>
@@ -222,4 +222,4 @@ struct inspector<std::priority_queue<T>> {
   }
 };
 
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils

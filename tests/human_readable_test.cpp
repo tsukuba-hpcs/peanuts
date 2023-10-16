@@ -1,11 +1,11 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "rpmbb/util/human_readable.hpp"
-#include "rpmbb/util/power.hpp"
+#include "rpmbb/utils/human_readable.hpp"
+#include "rpmbb/utils/power.hpp"
 
 #include <doctest/doctest.h>
 
-using namespace rpmbb::util;
+using namespace rpmbb::utils;
 
 TEST_CASE("Testing power function") {
   CHECK(power<2, 0>() == 1);

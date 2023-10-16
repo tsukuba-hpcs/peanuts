@@ -11,7 +11,7 @@
 #include <thread>
 #include <vector>
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 namespace detail {
 
 class random_cpu_selector {
@@ -136,4 +136,4 @@ class tsc {
   }
 };
 
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils

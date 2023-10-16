@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rpmbb/util/power.hpp"
+#include "rpmbb/utils/power.hpp"
 
 #include <array>
 #include <charconv>
@@ -14,7 +14,7 @@
 
 #include <iostream>
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 
 template <int DECIMAL_FLEX_LIMIT = 3, typename T>
 std::string to_string_flexible_decimal(T value) {
@@ -102,4 +102,4 @@ T from_human(std::string_view sv) {
   return value * unit_iter->second.first / unit_iter->second.second;
 }
 
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils

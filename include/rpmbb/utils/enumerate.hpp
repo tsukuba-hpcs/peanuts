@@ -20,7 +20,7 @@
 #include <iterator>
 #include <tuple>
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 template <typename T>
 constexpr auto enumerate(T&& iterable) {
   struct iterator {
@@ -60,4 +60,4 @@ constexpr auto cenumerate(T&& iterable) {
   };
   return iterable_wrapper{std::forward<T>(iterable)};
 }
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils

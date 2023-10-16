@@ -65,7 +65,7 @@ TEST_CASE("comm") {
 
     comm.all_gather(std::span{send_data}, std::span{recv_data});
 
-    for (auto [i, v] : util::enumerate(recv_data)) {
+    for (auto [i, v] : utils::enumerate(recv_data)) {
       CHECK(v == i % 3 + 1);
     }
   }
@@ -77,7 +77,7 @@ TEST_CASE("comm") {
     comm.all_gather(std::as_bytes(std::span{send_data}),
                     std::as_writable_bytes(std::span{recv_data}));
 
-    for (auto [i, v] : util::enumerate(recv_data)) {
+    for (auto [i, v] : utils::enumerate(recv_data)) {
       CHECK(v == i % 3 + 1);
     }
   }
@@ -98,7 +98,7 @@ TEST_CASE("win") {
   CHECK(win.get_name() == "test");
 
   auto info = win.get_info();
-  MESSAGE(rpmbb::util::to_string(info));
+  MESSAGE(rpmbb::utils::to_string(info));
 
   char buf[4096];
   win.attach(std::as_writable_bytes(std::span(buf)));

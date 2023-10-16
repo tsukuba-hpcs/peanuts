@@ -4,7 +4,7 @@
 #include <utility>
 #include <cassert>
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 
 template <typename T>
 class singleton {
@@ -64,4 +64,4 @@ class singleton_initializer {
   bool should_finalize_ = false;
 };
 
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils

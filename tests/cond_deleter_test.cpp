@@ -1,9 +1,9 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include "rpmbb/util/cond_deleter.hpp"
+#include "rpmbb/utils/cond_deleter.hpp"
 #include <doctest/doctest.h>
 
-using namespace rpmbb::util;
+using namespace rpmbb::utils;
 
 class dummy_deleter {
  public:

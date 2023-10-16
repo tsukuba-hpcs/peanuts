@@ -7,7 +7,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace rpmbb::util {
+namespace rpmbb::utils {
 
 class welford {
  public:
@@ -95,4 +95,4 @@ class welford {
   double m2_{0.0};
 };
 
-}  // namespace rpmbb::util
+}  // namespace rpmbb::utils

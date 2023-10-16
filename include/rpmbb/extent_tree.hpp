@@ -74,7 +74,7 @@ class extent_tree {
     }
 
     std::ostream& inspect(std::ostream& os) const {
-      return os << "[" << util::make_inspector(ex) << ":" << ptr << ":"
+      return os << "[" << utils::make_inspector(ex) << ":" << ptr << ":"
                 << client_id << "]";
     }
   };
@@ -216,7 +216,7 @@ class extent_tree {
 
   std::ostream& inspect(std::ostream& os) const {
     for (const auto& node : nodes_) {
-      os << util::make_inspector(node);
+      os << utils::make_inspector(node);
     }
     return os;
   }
