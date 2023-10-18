@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
 }
 
 TEST_CASE("topology") {
-  rpmbb::topology topo{mpi::comm::world()};
+  rpmbb::topology topo{};
 
   // Validate basic rank and size operations
   int world_rank = MPI_COMM_WORLD;

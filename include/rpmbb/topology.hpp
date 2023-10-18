@@ -30,19 +30,19 @@ struct rank_pair {
 
 class topology {
  public:
-  explicit topology(const mpi::comm& comm)
-      : comm_(&comm),
-        intra_comm_{comm, mpi::split_type::shared},
-        inter_comm_{comm, intra_comm_.rank()},
+  explicit topology(mpi::comm comm = mpi::comm{MPI_COMM_WORLD})
+      : comm_(std::move(comm)),
+        intra_comm_{comm_, mpi::split_type::shared},
+        inter_comm_{comm_, intra_comm_.rank()},
         rank_map_{create_rank_map()},
         inverted_rank_map_{create_inverted_rank_map()} {}
 
-  auto comm() const -> const mpi::comm& { return *comm_; }
+  auto comm() const -> const mpi::comm& { return comm_; }
   auto intra_comm() const -> const mpi::comm& { return intra_comm_; }
   auto inter_comm() const -> const mpi::comm& { return inter_comm_; }
 
-  auto rank() const -> int { return comm_->rank(); }
-  auto size() const -> int { return comm_->size(); }
+  auto rank() const -> int { return comm_.rank(); }
+  auto size() const -> int { return comm_.size(); }
   auto intra_rank() const -> int { return intra_comm_.rank(); }
   auto intra_size() const -> int { return intra_comm_.size(); }
   auto inter_rank() const -> int { return inter_comm_.rank(); }
@@ -98,7 +98,7 @@ class topology {
   }
 
  private:
-  const mpi::comm* comm_;
+  mpi::comm comm_;
   mpi::comm intra_comm_;
   mpi::comm inter_comm_;
   std::vector<rank_pair> rank_map_;
