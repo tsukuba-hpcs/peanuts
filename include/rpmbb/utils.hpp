@@ -9,6 +9,7 @@
 #include "rpmbb/utils/sense_barrier.hpp"
 #include "rpmbb/utils/singleton.hpp"
 #include "rpmbb/utils/stopwatch.hpp"
+#include "rpmbb/utils/system.hpp"
 #include "rpmbb/utils/tls.hpp"
 #include "rpmbb/utils/tsc.hpp"
 #include "rpmbb/utils/varint_encoding.hpp"
