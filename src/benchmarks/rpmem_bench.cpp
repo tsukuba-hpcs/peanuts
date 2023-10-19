@@ -244,9 +244,9 @@ auto main(int argc, char* argv[]) -> int try {
   auto target_seed =
       seed ? decltype(seed)(*seed + target_rank + topo.intra_rank())
            : std::nullopt;
-  fmt::print("myrank: {}, my_seed: {}, target_rank: {}, target_seed: {}\n",
-             topo.rank(), my_seed.value_or(0), target_rank,
-             target_seed.value_or(0));
+  // fmt::print("myrank: {}, my_seed: {}, target_rank: {}, target_seed: {}\n",
+  //            topo.rank(), my_seed.value_or(0), target_rank,
+  //            target_seed.value_or(0));
 
   rsg = utils::random_string_generator{target_seed};
   topo.comm().barrier();
