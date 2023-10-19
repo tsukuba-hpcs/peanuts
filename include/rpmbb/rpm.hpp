@@ -3,11 +3,13 @@
 #include "rpmbb/mpi/win.hpp"
 #include "rpmbb/pmem2.hpp"
 #include "rpmbb/topology.hpp"
+#include "rpmbb/utils/human_readable.hpp"
 #include "rpmbb/utils/power.hpp"
 
 #include <libpmem2.h>
 
 #include <mutex>
+#include <ostream>
 
 namespace rpmbb {
 class rpm {
@@ -32,6 +34,13 @@ class rpm {
             utils::round_down_pow2<size_t>(local_size_ / topo_->intra_size(),
                                            pmem_alignment)},
         my_local_region_disp_{local_region_disp(topo_->intra_rank())} {}
+
+  std::ostream& inspect(std::ostream& os) const {
+    os << "rpm" << std::endl;
+    os << "  local_size: " << utils::to_human(local_size()) << std::endl;
+    os << "  region_size: " << utils::to_human(region_size()) << std::endl;
+    return os;
+  }
 
   rpm(const rpm&) = delete;
   auto operator=(const rpm&) -> rpm& = delete;

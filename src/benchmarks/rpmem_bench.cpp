@@ -10,7 +10,9 @@
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <ostream>
+#include <random>
 #include <span>
 #include <thread>
 #include <vector>
@@ -115,6 +117,20 @@ auto to_string(std::span<const std::byte> span) -> std::string {
   return str;
 }
 
+bool compare_vector_string(const std::vector<std::byte>& v,
+                           const std::string& s) {
+  if (v.size() != s.size()) {
+    return false;
+  }
+
+  for (std::size_t i = 0; i < v.size(); ++i) {
+    if (v[i] != static_cast<std::byte>(s[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
 auto main(int argc, char* argv[]) -> int try {
   using namespace rpmbb;
   mpi::env env(&argc, &argv);
@@ -127,6 +143,7 @@ auto main(int argc, char* argv[]) -> int try {
     ("p,path", "path to pmem device", cxxopts::value<std::string>()->default_value("/dev/dax0.0"))
     ("t,transfer", "transfer size", cxxopts::value<size_t>()->default_value("4096"))
     ("b,block", "block size - contiguous bytes to write per task", cxxopts::value<size_t>()->default_value("2097152"))
+    ("verify", "verify mode. need to set seed.", cxxopts::value<std::seed_seq::result_type>()->implicit_value("42"))
   ;
   // clang-format on
 
@@ -145,14 +162,20 @@ auto main(int argc, char* argv[]) -> int try {
 
   const auto transfer_size = parsed["transfer"].as<size_t>();
   const auto block_size = parsed["block"].as<size_t>();
+  const auto verify = parsed.count("verify") != 0U;
+  const auto seed = parsed.count("verify") != 0U
+                        ? std::optional<std::seed_seq::result_type>(
+                              parsed["verify"].as<std::seed_seq::result_type>())
+                        : std::nullopt;
 
   assert(block_size % transfer_size == 0);
-  assert(block_size >= rpm::pmem_alignment);
+  // assert(block_size >= rpm::pmem_alignment);
 
   rpmbb::topology topo{};
   rpmbb::rpm rpm{&topo, parsed["path"].as<std::string>(),
-                 utils::round_up_pow2(block_size * topo.intra_size(),
-                                      rpm::pmem_alignment)};
+                 utils::round_up_pow2(block_size, rpm::pmem_alignment) *
+                     topo.intra_size()};
+  // std::cout << utils::make_inspector(rpm) << std::endl;
 
   ordered_json bench_result = {
       {"version", RPMBB_VERSION},
@@ -184,10 +207,11 @@ auto main(int argc, char* argv[]) -> int try {
   // fmt::print("myrank: {}, local_region_disp: {}\n", topo.rank(),
   //            utils::to_human(local_region_disp));
 
+  auto my_seed = seed ? decltype(seed)(*seed + topo.rank()) : std::nullopt;
+  auto rsg = utils::random_string_generator{my_seed};
+  auto random_data_buffer = rsg.generate(transfer_size);
   // const auto random_data_buffer =
-  //     utils::generate_random_alphanumeric_string(transfer_size);
-  const auto random_data_buffer =
-      std::string(transfer_size, std::to_string(topo.rank())[0]);
+  //     std::string(transfer_size, std::to_string(topo.rank())[0]);
   auto xfer_buffer = std::vector<std::byte>(transfer_size);
 
   auto wf_read = utils::welford{};
@@ -197,10 +221,19 @@ auto main(int argc, char* argv[]) -> int try {
   topo.comm().barrier();
   sw.reset();
   topo.comm().barrier();
-  for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
-    rpm.file_ops().pwrite_nt(std::as_bytes(std::span{random_data_buffer}),
-                             local_region_disp + ofs);
-    wf_write.add(sw.lap_time().count());
+  if (!verify) {
+    for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
+      rpm.file_ops().pwrite_nt(std::as_bytes(std::span{random_data_buffer}),
+                               local_region_disp + ofs);
+      wf_write.add(sw.lap_time().count());
+    }
+  } else {
+    for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
+      rpm.file_ops().pwrite_nt(std::as_bytes(std::span{random_data_buffer}),
+                               local_region_disp + ofs);
+      wf_write.add(sw.lap_time().count());
+      random_data_buffer = rsg.generate(transfer_size);
+    }
   }
   topo.comm().barrier();
   auto write_elapsed_time = sw.get();
@@ -208,6 +241,14 @@ auto main(int argc, char* argv[]) -> int try {
   auto target_rank = topo.rank_pair2global_rank(
       (topo.inter_rank() + 1) % topo.inter_size(), 0);
   // fmt::print("myrank: {}, target_rank: {}\n", topo.rank(), target_rank);
+  auto target_seed =
+      seed ? decltype(seed)(*seed + target_rank + topo.intra_rank())
+           : std::nullopt;
+  fmt::print("myrank: {}, my_seed: {}, target_rank: {}, target_seed: {}\n",
+             topo.rank(), my_seed.value_or(0), target_rank,
+             target_seed.value_or(0));
+
+  rsg = utils::random_string_generator{target_seed};
   topo.comm().barrier();
 
   // warm up
@@ -222,33 +263,32 @@ auto main(int argc, char* argv[]) -> int try {
   topo.comm().barrier();
 
   // read
-  for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
-    rpm.win().get(xfer_buffer, target_rank,
-                  static_cast<MPI_Aint>(local_region_disp + ofs));
-    rpm.win().flush(target_rank);
-    wf_read.add(sw.lap_time().count());
+  if (!verify) {
+    for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
+      rpm.win().get(xfer_buffer, target_rank,
+                    static_cast<MPI_Aint>(local_region_disp + ofs));
+      rpm.win().flush(target_rank);
+      wf_read.add(sw.lap_time().count());
+    }
+  } else {
+    for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
+      rpm.win().get(xfer_buffer, target_rank,
+                    static_cast<MPI_Aint>(local_region_disp + ofs));
+      rpm.win().flush(target_rank);
+      auto neighbor_random_data_buffer = rsg.generate(transfer_size);
+      if (!compare_vector_string(xfer_buffer, neighbor_random_data_buffer)) {
+        fmt::print(stderr,
+                   "verification error on rank "
+                   "{} : read = {}, expected_read = {}\n ",
+                   topo.rank(), to_string(xfer_buffer).substr(0, 8),
+                   neighbor_random_data_buffer.substr(0, 8));
+      }
+      wf_read.add(sw.lap_time().count());
+    }
   }
 
   topo.comm().barrier();
   auto read_elapsed_time = sw.get();
-
-  // verify xfer_buffer == neighbor's random_data_buffer
-  auto neighbor_random_data_buffer = std::vector<std::byte>(transfer_size);
-  topo.comm().send_receive(
-      random_data_buffer,
-      (topo.rank() + (topo.size() - shift_unit)) % topo.size(), 0,
-      neighbor_random_data_buffer);
-  if (!std::equal(xfer_buffer.begin(), xfer_buffer.end(),
-                  neighbor_random_data_buffer.begin(),
-                  neighbor_random_data_buffer.end())) {
-    fmt::print(stderr,
-               "Error: xfer_buffer != neighbor_random_data_buffer on rank {} : "
-               "write = {}, read = {}, expected_read = {}\n ",
-               topo.rank(), random_data_buffer.substr(0, 8),
-               to_string(xfer_buffer).substr(0, 8),
-               to_string(neighbor_random_data_buffer).substr(0, 8));
-  }
-
   topo.comm().barrier();
 
   mpi::run_on_rank0([&] {
