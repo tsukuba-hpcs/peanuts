@@ -38,7 +38,7 @@ class bb_handler {
   bb_handler(std::shared_ptr<bb> bb,
              int fd,
              std::reference_wrapper<rpm> rpm_ref)
-      : bb_(std::move(bb)), fd_(std::move(fd)), rpm_ref_(rpm_ref) {}
+      : bb_(std::move(bb)), fd_(fd), rpm_ref_(rpm_ref) {}
 
  private:
   std::shared_ptr<bb> bb_;
@@ -53,7 +53,7 @@ class bb_store {
   std::unique_ptr<bb_handler> open(ino_t ino, int fd) {
     auto bb_obj = std::make_shared<bb>(bb{ino});
     auto [it, inserted] = bb_store_.insert(bb_obj);
-    return std::make_unique<bb_handler>(*it, std::move(fd), rpm_ref_);
+    return std::make_unique<bb_handler>(*it, fd, rpm_ref_);
   }
 
   std::unique_ptr<bb_handler> open(int fd) {
