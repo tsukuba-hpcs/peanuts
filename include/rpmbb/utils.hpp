@@ -3,6 +3,8 @@
 #include "rpmbb/utils/cpu_affinity_manager.hpp"
 #include "rpmbb/utils/delta_encoding.hpp"
 #include "rpmbb/utils/enumerate.hpp"
+#include "rpmbb/utils/env.hpp"
+#include "rpmbb/utils/fs.hpp"
 #include "rpmbb/utils/gen_random_string.hpp"
 #include "rpmbb/utils/human_readable.hpp"
 #include "rpmbb/utils/power.hpp"
