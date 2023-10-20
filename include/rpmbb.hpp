@@ -1,4 +1,5 @@
 #pragma once
+#include "rpmbb/bb.hpp"
 #include "rpmbb/extent_tree.hpp"
 #include "rpmbb/inspector.hpp"
 #include "rpmbb/mpi.hpp"
