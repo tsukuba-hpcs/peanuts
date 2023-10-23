@@ -4,6 +4,7 @@ USER root
 RUN \
   # sshd
   export DEBIAN_FRONTEND=noninteractive \
+  && apt-get update \
   && apt-get -y install --no-install-recommends \
     openssh-server \
   # sshd_config
@@ -27,8 +28,10 @@ RUN \
 RUN \
   # additinal packages
   export DEBIAN_FRONTEND=noninteractive \
+  && apt-get update \
   && apt-get -y install --no-install-recommends \
     flex \
+    liburing-dev \
   # Clean up
   && apt-get autoremove -y \
   && apt-get clean -y \
