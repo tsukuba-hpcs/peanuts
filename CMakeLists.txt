@@ -87,6 +87,12 @@ pkg_check_modules(
   IMPORTED_TARGET
   libpmem2
 )
+pkg_check_modules(
+  Liburing
+  REQUIRED
+  IMPORTED_TARGET
+  liburing
+)
 
 # ---- headers ----
 file(
@@ -103,7 +109,9 @@ target_include_directories(
   ${PROJECT_NAME} INTERFACE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
                             "$<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>"
 )
-target_link_libraries(${PROJECT_NAME} INTERFACE MPI::MPI_CXX PkgConfig::Libpmem2)
+target_link_libraries(
+  ${PROJECT_NAME} INTERFACE MPI::MPI_CXX PkgConfig::Libpmem2 PkgConfig::Liburing
+)
 
 include(cmake/version.cmake)
 target_add_version_header(

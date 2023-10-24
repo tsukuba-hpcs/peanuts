@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 #include <unistd.h>
 
 #include <libpmem2.h>
@@ -199,6 +200,8 @@ class map {
   auto as_span() const noexcept -> std::span<std::byte> {
     return {static_cast<std::byte*>(address()), size()};
   }
+
+  auto as_iovec() const noexcept -> ::iovec { return {address(), size()}; }
 
   auto store_granularity() const noexcept -> pmem2_granularity {
     return ::pmem2_map_get_store_granularity(map_.get());
