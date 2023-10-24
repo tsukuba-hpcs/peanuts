@@ -1,6 +1,8 @@
 /build*
 /install*
 
+.vscode/settings.json
+
 ### C++ ###
 # Prerequisites
 *.d
