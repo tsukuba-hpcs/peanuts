@@ -172,7 +172,7 @@ auto main(int argc, char* argv[]) -> int try {
   // assert(block_size >= rpm::pmem_alignment);
 
   rpmbb::topology topo{};
-  rpmbb::rpm rpm{&topo, parsed["path"].as<std::string>(),
+  rpmbb::rpm rpm{topo, parsed["path"].as<std::string>(),
                  utils::round_up_pow2(block_size, rpm::pmem_alignment) *
                      topo.intra_size()};
   // std::cout << utils::make_inspector(rpm) << std::endl;

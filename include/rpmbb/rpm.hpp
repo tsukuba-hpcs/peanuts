@@ -8,6 +8,7 @@
 
 #include <libpmem2.h>
 
+#include <functional>
 #include <mutex>
 #include <ostream>
 
@@ -16,11 +17,10 @@ class rpm {
  public:
   static constexpr size_t pmem_alignment = 1ULL << 21;
 
-  rpm() = default;
-  explicit rpm(const topology* topo,
+  explicit rpm(std::reference_wrapper<const topology> topo_ref,
                std::string_view pmem_path,
                size_t pmem_size = 0)
-      : topo_(topo),
+      : topo_(std::move(topo_ref)),
         device_{create_pmem2_device(pmem_path, pmem_size)},
         source_{device_},
         config_{PMEM2_GRANULARITY_PAGE},
@@ -30,10 +30,10 @@ class rpm {
         win_mutex_{win_, MPI_MODE_NOCHECK},
         win_lock_{win_mutex_},
         local_size_{utils::round_down_pow2(map_.size(), pmem_alignment)},
-        region_size_{
-            utils::round_down_pow2<size_t>(local_size_ / topo_->intra_size(),
-                                           pmem_alignment)},
-        my_local_region_disp_{local_region_disp(topo_->intra_rank())} {}
+        region_size_{utils::round_down_pow2<size_t>(
+            local_size_ / topo_.get().intra_size(),
+            pmem_alignment)},
+        my_local_region_disp_{local_region_disp(topo_.get().intra_rank())} {}
 
   std::ostream& inspect(std::ostream& os) const {
     os << "rpm" << std::endl;
@@ -59,7 +59,8 @@ class rpm {
 
   auto local_size() const -> size_t { return local_size_; }
   auto global_size() const -> size_t {
-    return local_size() * topo_->inter_size();  // FIXME: use topo_->node_size()
+    return local_size() *
+           topo_.get().inter_size();  // FIXME: use topo_->node_size()
   }
 
   auto region_size() const -> size_t { return region_size_; }
@@ -72,7 +73,7 @@ class rpm {
                                     size_t pmem_size) {
     auto device = pmem2::device{pmem_path};
     if (!device.is_devdax() && pmem_size > 0) {
-      if (topo_->intra_rank() == 0) {
+      if (topo_.get().intra_rank() == 0) {
         device.truncate(pmem_size);
       }
     }
@@ -80,15 +81,15 @@ class rpm {
   }
 
   mpi::win create_win() {
-    if (topo_->intra_rank() == 0) {
-      return mpi::win{topo_->comm(), map_.as_span()};
+    if (topo_.get().intra_rank() == 0) {
+      return mpi::win{topo_.get().comm(), map_.as_span()};
     } else {
-      return mpi::win{topo_->comm(), std::span<std::byte>{}};
+      return mpi::win{topo_.get().comm(), std::span<std::byte>{}};
     }
   }
 
  private:
-  const topology* topo_ = nullptr;
+  std::reference_wrapper<const topology> topo_;
   pmem2::device device_{};
   pmem2::source source_{};
   pmem2::config config_{};

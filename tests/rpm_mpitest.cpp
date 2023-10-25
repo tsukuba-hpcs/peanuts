@@ -27,5 +27,5 @@ int main(int argc, char** argv) {
 
 TEST_CASE("rpm") {
   topology topo{};
-  rpm rpm{&topo, "/tmp/pmem2_devtest", (1ULL << 21)};
+  rpm rpm{topo, "/tmp/pmem2_devtest", (1ULL << 21)};
 }
