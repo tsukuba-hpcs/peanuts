@@ -323,7 +323,12 @@ class file_operations {
 
  public:
   file_operations() = default;
-  explicit file_operations(const map& map) { associate_with(map); }
+  explicit file_operations(const map& map)
+      : ops_{map}, address_{map.address()}, size_{map.size()} {}
+  explicit file_operations(const memory_operations& ops,
+                           void* address,
+                           size_t size)
+      : ops_(ops), address_(address), size_(size) {}
   auto associate_with(const map& map) -> void {
     ops_.associate_with(map);
     address_ = map.address();
@@ -334,6 +339,10 @@ class file_operations {
   file_operations(file_operations&&) = default;
   auto operator=(file_operations&&) -> file_operations& = default;
   ~file_operations() = default;
+
+  auto sub_file_ops(size_t ofs, size_t size) const -> file_operations {
+    return file_operations{ops_, to_addr(ofs), size};
+  }
 
   auto mem_ops() const noexcept -> const memory_operations& { return ops_; }
 
