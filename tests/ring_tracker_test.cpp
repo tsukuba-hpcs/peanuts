@@ -55,7 +55,7 @@ TEST_CASE("Conversion to ring offset") {
   ring_tracker rt(1000);
 
   uint64_t segment_id = rt.allocate(500);
-  CHECK(rt.to_ring_offset(segment_id) == 0);
+  CHECK(rt.to_ofs(segment_id) == 0);
 }
 
 TEST_CASE(
@@ -72,9 +72,9 @@ TEST_CASE(
   // At this point, tail is at 400 and head is at 1100 (after wrapping)
   // Current layout: [100 used | 400 free | 300 used | 300 used (wrapped)]
 
-  CHECK(rt.to_ring_offset(segment_id_1) == 0);
-  CHECK(rt.to_ring_offset(segment_id_2) == 400);
-  CHECK(rt.to_ring_offset(segment_id_3) == 700);
+  CHECK(rt.to_ofs(segment_id_1) == 0);
+  CHECK(rt.to_ofs(segment_id_2) == 400);
+  CHECK(rt.to_ofs(segment_id_3) == 700);
 
   CHECK_FALSE(rt.is_wrapping(segment_id_1, 100));
   CHECK_FALSE(rt.is_wrapping(segment_id_2, 100));
