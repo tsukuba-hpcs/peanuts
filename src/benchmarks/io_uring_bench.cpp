@@ -195,7 +195,8 @@ auto main(int argc, char* argv[]) -> int try {
   ::io_uring_cqe* cqe;
   for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
     ::io_uring_sqe* sqe = io_uring_get_sqe(&ring);
-    ::io_uring_prep_write(sqe, fd.get(), pmem_map.address() + ofs,
+    ::io_uring_prep_write(sqe, fd.get(),
+                          static_cast<std::byte*>(pmem_map.address()) + ofs,
                           transfer_size, ofs);
     // ::io_uring_prep_write_fixed(sqe, fd.get(), pmem_map.address() + ofs,
     //                             transfer_size, ofs, 0);
