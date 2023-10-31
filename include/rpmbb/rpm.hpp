@@ -29,16 +29,15 @@ class rpm {
         win_{create_win()},
         win_mutex_{win_, MPI_MODE_NOCHECK},
         win_lock_{win_mutex_},
-        local_size_{utils::round_down_pow2(map_.size(), pmem_alignment)},
-        region_size_{utils::round_down_pow2<size_t>(
-            local_size_ / topo_.get().intra_size(),
-            pmem_alignment)},
-        my_local_region_disp_{local_region_disp(topo_.get().intra_rank())} {}
+        block_size_{
+            utils::round_down_pow2<size_t>(map_.size() / topo().intra_size(),
+                                           pmem_alignment)},
+        aligned_size_{block_size_ * topo().intra_size()} {}
 
   std::ostream& inspect(std::ostream& os) const {
     os << "rpm" << std::endl;
-    os << "  local_size: " << utils::to_human(local_size()) << std::endl;
-    os << "  region_size: " << utils::to_human(region_size()) << std::endl;
+    os << "  size: " << utils::to_human(size()) << std::endl;
+    os << "  block_size: " << utils::to_human(block_size()) << std::endl;
     return os;
   }
 
@@ -52,21 +51,11 @@ class rpm {
     return ops_.mem_ops();
   }
   auto win() const -> const mpi::win& { return win_; }
+  auto topo() const -> const topology& { return topo_.get(); }
 
-  auto get_store_granularity() const -> pmem2_granularity {
-    return map_.store_granularity();
-  }
-
-  auto local_size() const -> size_t { return local_size_; }
-  auto global_size() const -> size_t {
-    return local_size() *
-           topo_.get().inter_size();  // FIXME: use topo_->node_size()
-  }
-
-  auto region_size() const -> size_t { return region_size_; }
-  auto local_region_disp(int intra_rank) const -> size_t {
-    return intra_rank * region_size_;
-  }
+  auto size() const -> size_t { return aligned_size_; }
+  auto block_size() const -> size_t { return block_size_; }
+  auto disp(int intra_rank) const -> size_t { return intra_rank * block_size_; }
 
  private:
   pmem2::device create_pmem2_device(std::string_view pmem_path,
@@ -98,8 +87,7 @@ class rpm {
   mpi::win win_{};
   mpi::win_lock_all_adapter win_mutex_{};
   std::unique_lock<mpi::win_lock_all_adapter> win_lock_{};
-  size_t local_size_ = 0;
-  size_t region_size_ = 0;
-  size_t my_local_region_disp_ = 0;
+  size_t block_size_ = 0;
+  size_t aligned_size_ = 0;
 };
 }  // namespace rpmbb

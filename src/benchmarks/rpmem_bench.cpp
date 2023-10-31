@@ -185,8 +185,7 @@ auto main(int argc, char* argv[]) -> int try {
       {"np", topo.size()},
       {"ppn", topo.intra_size()},
       {"nnodes", topo.inter_size()},
-      {"pmem_size", rpm.local_size()},
-      {"pmem_store_granularity", rpm.get_store_granularity()},
+      {"pmem_size", rpm.size()},
   };
 
   int shift_unit = -1;
@@ -203,7 +202,7 @@ auto main(int argc, char* argv[]) -> int try {
   topo.comm().broadcast(shift_unit);
   // fmt::print("shft_unit: {}, my_rank: {}\n", shift_unit, comm.rank());
 
-  auto local_region_disp = rpm.local_region_disp(topo.intra_rank());
+  auto local_region_disp = rpm.disp(topo.intra_rank());
   // fmt::print("myrank: {}, local_region_disp: {}\n", topo.rank(),
   //            utils::to_human(local_region_disp));
 
