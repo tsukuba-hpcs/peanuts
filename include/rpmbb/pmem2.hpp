@@ -267,7 +267,7 @@ class memory_operations {
   auto memmove(void* pmemdest,
                const void* src,
                size_t len,
-               unsigned flags) const -> void* {
+               unsigned flags = 0) const -> void* {
     return memmove_fn_(pmemdest, src, len, flags);
   }
   auto memmove_nt(void* pmemdest, const void* src, size_t len) const -> void* {
@@ -283,7 +283,7 @@ class memory_operations {
       -> void* {
     return memmove_t(pmemdest, src, len, PMEM2_F_MEM_NOFLUSH);
   }
-  auto memset(void* pmemdest, int val, size_t len, unsigned flags) const
+  auto memset(void* pmemdest, int val, size_t len, unsigned flags = 0) const
       -> void* {
     return memset_fn_(pmemdest, val, len, flags);
   }
@@ -297,7 +297,7 @@ class memory_operations {
   auto memset_noflush(void* pmemdest, int val, size_t len) const -> void* {
     return memset_t(pmemdest, val, len, PMEM2_F_MEM_NOFLUSH);
   }
-  auto memcpy(void* pmemdest, const void* src, size_t len, unsigned flags) const
+  auto memcpy(void* pmemdest, const void* src, size_t len, unsigned flags = 0) const
       -> void* {
     return memcpy_fn_(pmemdest, src, len, flags);
   }
@@ -318,20 +318,20 @@ class memory_operations {
 
 class file_operations {
   memory_operations ops_{};
-  void* address_{};
+  void* data_{};
   size_t size_{};
 
  public:
   file_operations() = default;
   explicit file_operations(const map& map)
-      : ops_{map}, address_{map.address()}, size_{map.size()} {}
+      : ops_{map}, data_{map.address()}, size_{map.size()} {}
   explicit file_operations(const memory_operations& ops,
                            void* address,
                            size_t size)
-      : ops_(ops), address_(address), size_(size) {}
+      : ops_(ops), data_(address), size_(size) {}
   auto associate_with(const map& map) -> void {
     ops_.associate_with(map);
-    address_ = map.address();
+    data_ = map.address();
     size_ = map.size();
   }
   file_operations(const file_operations&) = default;
@@ -346,11 +346,11 @@ class file_operations {
 
   auto mem_ops() const noexcept -> const memory_operations& { return ops_; }
 
-  auto address() const noexcept -> void* { return address_; }
+  auto data() const noexcept -> void* { return data_; }
   auto size() const noexcept -> size_t { return size_; }
 
   auto to_addr(off_t ofs) const noexcept -> void* {
-    return static_cast<char*>(address_) + ofs;
+    return static_cast<char*>(data_) + ofs;
   }
 
   auto drain() const -> void { ops_.drain(); }
@@ -371,7 +371,7 @@ class file_operations {
     return buf;
   }
 
-  auto pwrite(std::span<const std::byte> buf, off_t ofs, unsigned flags) const
+  auto pwrite(std::span<const std::byte> buf, off_t ofs, unsigned flags = 0) const
       -> void {
     ops_.memcpy(to_addr(ofs), buf.data(), buf.size(), flags);
   }

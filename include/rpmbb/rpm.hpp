@@ -53,9 +53,42 @@ class rpm {
   auto win() const -> const mpi::win& { return win_; }
   auto topo() const -> const topology& { return topo_.get(); }
 
+  auto data() const -> void* { return map_.address(); }
   auto size() const -> size_t { return aligned_size_; }
+
+  auto block_data(int intra_rank) const -> void* {
+    return static_cast<std::byte*>(data()) + block_disp(intra_rank);
+  }
   auto block_size() const -> size_t { return block_size_; }
-  auto disp(int intra_rank) const -> size_t { return intra_rank * block_size_; }
+  auto block_disp(int intra_rank) const -> off_t {
+    return intra_rank * block_size_;
+  }
+
+  auto intra_offset(int intra_rank, off_t block_offset) const -> off_t {
+    return block_disp(intra_rank) + block_offset;
+  }
+
+  auto win_target_rank(int global_rank) const -> int {
+    return topo().global2intra_rank0_global_rank(global_rank);
+  }
+
+  auto win_block_disp(int global_rank) const -> off_t {
+    return block_disp(topo().global2intra_rank(global_rank));
+  }
+
+  auto get(std::span<std::byte> buf, int win_target_rank, off_t ofs) {
+    win_.get(buf, win_target_rank, mpi::aint(ofs));
+  }
+  auto flush(int win_target_rank) { win_.flush(win_target_rank); }
+
+  auto pread(std::span<std::byte> buf, int global_rank, off_t ofs) {
+    auto rank = win_target_rank(global_rank);
+    get(buf, rank, win_block_disp(global_rank) + ofs);
+    flush(rank);
+  }
+  auto pread_noflush(std::span<std::byte> buf, int global_rank, off_t ofs) {
+    get(buf, win_target_rank(global_rank), win_block_disp(global_rank) + ofs);
+  }
 
  private:
   pmem2::device create_pmem2_device(std::string_view pmem_path,
@@ -90,4 +123,47 @@ class rpm {
   size_t block_size_ = 0;
   size_t aligned_size_ = 0;
 };
+
+class rpm_block {
+ public:
+  explicit rpm_block(const rpm& rpm, int intra_rank = -1)
+      : rpm_ref_{std::cref(rpm)},
+        intra_rank_{intra_rank < 0 ? rpm.topo().intra_rank() : intra_rank},
+        data_{rpm.block_data(intra_rank_)},
+        size_{rpm.block_size()},
+        disp_{rpm.block_disp(intra_rank_)} {}
+
+  auto rpm() const -> const class rpm& { return rpm_ref_.get(); }
+
+  auto data() const -> void* { return data_; }
+  auto size() const -> size_t { return size_; }
+
+  auto pwrite(std::span<const std::byte> buf,
+              off_t offset,
+              unsigned flags = 0) const -> void {
+    rpm().file_ops().pwrite(buf, disp_ + offset, flags);
+  }
+  auto pwrite_nt(std::span<const std::byte> buf, off_t offset) const -> void {
+    pwrite(buf, offset, PMEM2_F_MEM_NONTEMPORAL);
+  }
+  auto pread(std::span<std::byte> buf, off_t offset) const -> void {
+    rpm().file_ops().pread(buf, disp_ + offset);
+  }
+
+  auto drain() const -> void { rpm().mem_ops().drain(); }
+  auto flush(off_t ofs, size_t size) const -> void {
+    rpm().file_ops().flush(disp_ + ofs, size);
+  }
+  auto persist(off_t ofs, size_t size) const -> void {
+    rpm().file_ops().persist(disp_ + ofs, size);
+  }
+
+ private:
+  std::reference_wrapper<const rpmbb::rpm> rpm_ref_;
+  int intra_rank_ = 0;
+  void* data_ = nullptr;
+  size_t size_ = 0;
+  off_t disp_ = 0;
+};
+
 }  // namespace rpmbb

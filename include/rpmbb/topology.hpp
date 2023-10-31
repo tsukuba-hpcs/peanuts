@@ -81,6 +81,10 @@ class topology {
     return inverted_rank_map_.at({inter_rank, intra_rank});
   }
 
+  auto global2intra_rank0_global_rank(const int global_rank) const -> int {
+    return global_rank - global2intra_rank(global_rank);
+  }
+
  private:
   auto create_rank_map() const -> std::vector<rank_pair> {
     std::vector<rank_pair> rank_map(size());
