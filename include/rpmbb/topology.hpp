@@ -7,6 +7,7 @@
 #include <ostream>
 #include <span>
 #include <tuple>
+#include <unordered_set>
 #include <vector>
 
 namespace rpmbb {
@@ -35,7 +36,8 @@ class topology {
         intra_comm_{comm_, mpi::split_type::shared},
         inter_comm_{comm_, intra_comm_.rank()},
         rank_map_{create_rank_map()},
-        inverted_rank_map_{create_inverted_rank_map()} {}
+        inverted_rank_map_{create_inverted_rank_map()},
+        cached_nnodes_{count_nnodes()} {}
 
   auto comm() const -> const mpi::comm& { return comm_; }
   auto intra_comm() const -> const mpi::comm& { return intra_comm_; }
@@ -48,6 +50,7 @@ class topology {
   auto inter_rank() const -> int { return inter_comm_.rank(); }
   auto inter_size() const -> int { return inter_comm_.size(); }
   auto np() const -> int { return size(); }
+  auto nnodes() const -> size_t { return cached_nnodes_; }
 
   auto global2inter_rank(const int global_rank) const -> int {
     return rank_map_[global_rank].inter;
@@ -97,12 +100,21 @@ class topology {
     return inverted_rank_map;
   }
 
+  auto count_nnodes() const -> size_t {
+    std::unordered_set<int> unique_elements;
+    for (const auto& pair : rank_map_) {
+      unique_elements.insert(pair.inter);
+    }
+    return unique_elements.size();
+  }
+
  private:
   mpi::comm comm_;
   mpi::comm intra_comm_;
   mpi::comm inter_comm_;
   std::vector<rank_pair> rank_map_;
   std::map<rank_pair, int> inverted_rank_map_;
+  size_t cached_nnodes_;
 };
 
 }  // namespace rpmbb

@@ -7,6 +7,8 @@ using namespace rpmbb;
 
 #include <mpi.h>
 
+#include <unordered_set>
+
 int main(int argc, char** argv) {
   // MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, nullptr);
   doctest::mpi_init_thread(argc, argv, MPI_THREAD_MULTIPLE);
@@ -48,4 +50,11 @@ TEST_CASE("topology") {
       CHECK(topo.global2rank_pair(intra_size) == rank_pair{1, 0});
     }
   }
+
+  // count nnodes
+  std::unordered_set<int> inter_ranks;
+  for(int rank = 0; rank < world_size; ++rank) {
+    inter_ranks.insert(topo.global2inter_rank(rank));
+  }
+  CHECK(topo.nnodes() == inter_ranks.size());
 }
