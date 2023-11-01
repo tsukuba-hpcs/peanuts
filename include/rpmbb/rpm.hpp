@@ -76,17 +76,19 @@ class rpm {
     return block_disp(topo().global2intra_rank(global_rank));
   }
 
-  auto get(std::span<std::byte> buf, int win_target_rank, off_t ofs) {
+  auto get(std::span<std::byte> buf, int win_target_rank, off_t ofs) const {
     win_.get(buf, win_target_rank, mpi::aint(ofs));
   }
-  auto flush(int win_target_rank) { win_.flush(win_target_rank); }
+  auto flush(int win_target_rank) const { win_.flush(win_target_rank); }
 
-  auto pread(std::span<std::byte> buf, int global_rank, off_t ofs) {
+  auto pread(std::span<std::byte> buf, int global_rank, off_t ofs) const {
     auto rank = win_target_rank(global_rank);
     get(buf, rank, win_block_disp(global_rank) + ofs);
     flush(rank);
   }
-  auto pread_noflush(std::span<std::byte> buf, int global_rank, off_t ofs) {
+  auto pread_noflush(std::span<std::byte> buf,
+                     int global_rank,
+                     off_t ofs) const {
     get(buf, win_target_rank(global_rank), win_block_disp(global_rank) + ofs);
   }
 
@@ -124,19 +126,21 @@ class rpm {
   size_t aligned_size_ = 0;
 };
 
-class rpm_block {
+class rpm_local_block {
  public:
-  explicit rpm_block(const rpm& rpm, int intra_rank = -1)
+  explicit rpm_local_block(const rpm& rpm)
       : rpm_ref_{std::cref(rpm)},
-        intra_rank_{intra_rank < 0 ? rpm.topo().intra_rank() : intra_rank},
-        data_{rpm.block_data(intra_rank_)},
-        size_{rpm.block_size()},
-        disp_{rpm.block_disp(intra_rank_)} {}
+        disp_{rpm.block_disp(rpm.topo().intra_rank())} {}
+
+  explicit rpm_local_block(const rpm& rpm, int intra_rank)
+      : rpm_ref_{std::cref(rpm)}, disp_{rpm.block_disp(intra_rank)} {}
 
   auto rpm() const -> const class rpm& { return rpm_ref_.get(); }
 
-  auto data() const -> void* { return data_; }
-  auto size() const -> size_t { return size_; }
+  auto data() const -> void* {
+    return static_cast<std::byte*>(rpm().data()) + disp_;
+  }
+  auto size() const -> size_t { return rpm().block_size(); }
 
   auto pwrite(std::span<const std::byte> buf,
               off_t offset,
@@ -160,10 +164,39 @@ class rpm_block {
 
  private:
   std::reference_wrapper<const rpmbb::rpm> rpm_ref_;
-  int intra_rank_ = 0;
-  void* data_ = nullptr;
-  size_t size_ = 0;
   off_t disp_ = 0;
+};
+
+class rpm_remote_block {
+ public:
+  explicit rpm_remote_block(const rpm& rpm, int global_rank)
+      : rpm_ref_{std::cref(rpm)},
+        win_target_rank_{rpm.win_target_rank(global_rank)},
+        win_block_disp_{rpm.win_block_disp(global_rank)} {}
+
+  auto rpm() const -> const class rpm& { return rpm_ref_.get(); }
+
+  auto size() const -> size_t { return rpm().block_size(); }
+
+  auto flush() const { rpm().win().flush(win_target_rank_); }
+
+  auto get(std::span<std::byte> buf, off_t ofs) const {
+    rpm().win().get(buf, win_target_rank_, mpi::aint(win_block_disp_ + ofs));
+  }
+
+  auto pread_noflush(std::span<std::byte> buf, off_t ofs) const {
+    get(buf, ofs);
+  }
+
+  auto pread(std::span<std::byte> buf, off_t ofs) const {
+    get(buf, ofs);
+    flush();
+  }
+
+ private:
+  std::reference_wrapper<const rpmbb::rpm> rpm_ref_;
+  int win_target_rank_ = 0;
+  off_t win_block_disp_ = 0;
 };
 
 }  // namespace rpmbb

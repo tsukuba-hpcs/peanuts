@@ -176,7 +176,7 @@ auto main(int argc, char* argv[]) -> int try {
                  utils::round_up_pow2(block_size, rpm::pmem_alignment) *
                      topo.intra_size()};
   // std::cout << utils::make_inspector(rpm) << std::endl;
-  rpmbb::rpm_block rpm_block{rpm};
+  rpmbb::rpm_local_block rpm_block{rpm};
 
   ordered_json bench_result = {
       {"version", RPMBB_VERSION},
@@ -232,13 +232,9 @@ auto main(int argc, char* argv[]) -> int try {
   topo.comm().barrier();
   auto write_elapsed_time = sw.get();
 
-  // auto target_rank = topo.rank_pair2global_rank(
-  //     (topo.inter_rank() + 1) % topo.inter_size(), 0);
   auto target_rank = (topo.rank() + shift_unit) % topo.size();
-  auto win_target_rank = rpm.win_target_rank(target_rank);
-  auto win_block_disp = rpm.win_block_disp(target_rank);
-  // fmt::print("myrank: {}, target_rank: {}, win_target_rank: {}, target_rank_pair: {}\n", topo.rank(),
-  //            target_rank, win_target_rank, utils::to_string(topo.global2rank_pair(target_rank)));
+  rpmbb::rpm_remote_block remote_block{rpm, target_rank};
+  auto xfer_buffer_span = std::span{xfer_buffer};
   auto target_seed = seed ? decltype(seed)(*seed + target_rank) : std::nullopt;
   // fmt::print("myrank: {}, my_seed: {}, target_rank: {}, target_seed: {}\n",
   //            topo.rank(), my_seed.value_or(0), target_rank,
@@ -249,9 +245,9 @@ auto main(int argc, char* argv[]) -> int try {
 
   // warm up
   for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
-    rpm.get(std::span{xfer_buffer}, win_target_rank, win_block_disp + ofs);
+    remote_block.get(xfer_buffer_span, ofs);
   }
-  rpm.flush(win_target_rank);
+  remote_block.flush();
 
   topo.comm().barrier();
   sw.reset();
@@ -259,24 +255,20 @@ auto main(int argc, char* argv[]) -> int try {
 
   // read
   if (!verify) {
-    auto xfer_buffer_span = std::span{xfer_buffer};
     for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
-      rpm.get(xfer_buffer_span, win_target_rank, win_block_disp + ofs);
-      rpm.flush(win_target_rank);
+      remote_block.pread(xfer_buffer_span, ofs);
       wf_read.add(sw.lap_time().count());
     }
   } else {
-    auto xfer_buffer_span = std::span{xfer_buffer};
     for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
-      rpm.get(xfer_buffer_span, win_target_rank, win_block_disp + ofs);
-      rpm.flush(win_target_rank);
-      auto neighbor_random_data_buffer = rsg.generate(transfer_size);
-      if (!compare_vector_string(xfer_buffer, neighbor_random_data_buffer)) {
+      remote_block.pread(xfer_buffer_span, ofs);
+      auto target_random_data_buffer = rsg.generate(transfer_size);
+      if (!compare_vector_string(xfer_buffer, target_random_data_buffer)) {
         fmt::print(stderr,
                    "verification error on rank "
                    "{} : read = {}, expected_read = {}\n ",
                    topo.rank(), to_string(xfer_buffer).substr(0, 8),
-                   neighbor_random_data_buffer.substr(0, 8));
+                   target_random_data_buffer.substr(0, 8));
       }
       wf_read.add(sw.lap_time().count());
     }
