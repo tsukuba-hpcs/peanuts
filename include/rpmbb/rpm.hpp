@@ -129,8 +129,7 @@ class rpm {
 class rpm_local_block {
  public:
   explicit rpm_local_block(const rpm& rpm)
-      : rpm_ref_{std::cref(rpm)},
-        disp_{rpm.block_disp(rpm.topo().intra_rank())} {}
+      : rpm_local_block(rpm, rpm.topo().intra_rank()) {}
 
   explicit rpm_local_block(const rpm& rpm, int intra_rank)
       : rpm_ref_{std::cref(rpm)}, disp_{rpm.block_disp(intra_rank)} {}
