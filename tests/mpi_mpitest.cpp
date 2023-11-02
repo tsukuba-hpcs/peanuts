@@ -83,6 +83,64 @@ TEST_CASE("comm") {
   }
 }
 
+TEST_CASE("comm::all_gather_v") {
+  const auto& comm = rpmbb::mpi::comm::world();
+  CHECK(comm.size() == doctest::mpi_comm_world_size());
+
+  SUBCASE("all_gather_v with different sizes") {
+    // Each process is assumed to have data of size rank + 1.
+    const std::vector<int> send_data(comm.rank() + 1, comm.rank());
+
+    // Buffer to collect data sizes from all processes.
+    std::vector<int> recv_counts(comm.size());
+    std::iota(recv_counts.begin(), recv_counts.end(), 1);  // 1 2 3 ...
+
+    // Calculate displs for the placement of received data.
+    std::vector<int> recv_displs(comm.size());
+    std::exclusive_scan(recv_counts.begin(), recv_counts.end(),
+                        recv_displs.begin(), 0);
+
+    // Buffer to collect received data.
+    std::vector<int> recv_data(
+        std::accumulate(recv_counts.begin(), recv_counts.end(), 0));
+
+    comm.all_gather_v(std::span{send_data}, std::span{recv_data},
+                      std::span{recv_counts}, std::span{recv_displs});
+
+    // Check the expected range of data from each rank.
+    for (int rank = 0; rank < comm.size(); ++rank) {
+      // Check received data against expected values.
+      for (int i = 0; i < recv_counts[rank]; ++i) {
+        const int expected_value = rank;
+        const int index = recv_displs[rank] + i;
+        CHECK(recv_data[index] == expected_value);
+      }
+    }
+  }
+
+  SUBCASE("all_gather_v with recv_counts only") {
+    const std::vector<int> send_data(comm.rank() + 1, comm.rank());
+
+    std::vector<int> recv_counts(comm.size());
+    std::iota(recv_counts.begin(), recv_counts.end(), 1);
+
+    std::vector<int> recv_data(
+        std::accumulate(recv_counts.begin(), recv_counts.end(), 0));
+
+    comm.all_gather_v(std::span{send_data}, std::span{recv_data},
+                      std::span{recv_counts});
+
+    int index = 0;
+    for (int rank = 0; rank < comm.size(); ++rank) {
+      for (int i = 0; i < recv_counts[rank]; ++i) {
+        const int expected_value = rank;
+        CHECK(recv_data[index] == expected_value);
+        index++;
+      }
+    }
+  }
+}
+
 TEST_CASE("win") {
   const auto& comm = mpi::comm::world();
   mpi::win win{comm};

@@ -11,6 +11,7 @@
 #include "rpmbb/mpi/type.hpp"
 #include "rpmbb/mpi/type_traits.hpp"
 
+#include <numeric>
 #include <span>
 
 namespace rpmbb::mpi {
@@ -99,6 +100,40 @@ class comm {
     using send_adapter = detail::container_adapter<const T>;
     all_gather(send_adapter::to_cspan(send_data), send_adapter::to_dtype(),
                recv_data, mpi::to_dtype<std::remove_cv_t<U>>());
+  }
+
+  template <typename T, typename U>
+  void all_gather_v(std::span<const T> send_data,
+                    const dtype& send_dtype,
+                    std::span<U> recv_data,
+                    const dtype& recv_dtype,
+                    std::span<const int> recv_counts,
+                    std::span<const int> recv_displs) const {
+    MPI_CHECK_ERROR_CODE(
+        MPI_Allgatherv(send_data.data(), static_cast<int>(send_data.size()),
+                       send_dtype, recv_data.data(), recv_counts.data(),
+                       recv_displs.data(), recv_dtype, native()));
+  }
+
+  template <typename T, typename U>
+  void all_gather_v(const T& send_data,
+                    std::span<U> recv_data,
+                    std::span<const int> recv_counts,
+                    std::span<const int> recv_displs) const {
+    using send_adapter = detail::container_adapter<const T>;
+    all_gather_v(send_adapter::to_cspan(send_data), send_adapter::to_dtype(),
+                 recv_data, mpi::to_dtype<std::remove_cv_t<U>>(), recv_counts,
+                 recv_displs);
+  }
+
+  template <typename T, typename U>
+  void all_gather_v(const T& send_data,
+                    std::span<U> recv_data,
+                    std::span<const int> recv_counts) const {
+    std::vector<int> recv_displs(recv_counts.size());
+    std::exclusive_scan(recv_counts.begin(), recv_counts.end(),
+                        recv_displs.begin(), 0);
+    all_gather_v(send_data, recv_data, recv_counts, recv_displs);
   }
 
   template <typename T>
