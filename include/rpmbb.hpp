@@ -5,6 +5,7 @@
 #include "rpmbb/mpi.hpp"
 #include "rpmbb/options.hpp"
 #include "rpmbb/pmem2.hpp"
+#include "rpmbb/ring_buffer.hpp"
 #include "rpmbb/ring_tracker.hpp"
 #include "rpmbb/rpm.hpp"
 #include "rpmbb/runtime.hpp"

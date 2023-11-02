@@ -40,6 +40,8 @@ class bb_handler {
              std::reference_wrapper<rpm> rpm_ref)
       : bb_(std::move(bb)), fd_(fd), rpm_ref_(rpm_ref) {}
 
+  auto bb_ref() -> rpmbb::bb& { return *bb_; }
+
  private:
   std::shared_ptr<bb> bb_;
   int fd_;
