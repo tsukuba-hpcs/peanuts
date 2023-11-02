@@ -222,3 +222,44 @@ TEST_CASE("Test long scenario imported from UnifyFS test code") {
     CHECK(utils::to_string(tree) == "[1-11:101:0][20-25:20:0][32-41:132:0]");
   }
 }
+
+TEST_CASE("extent serialization") {
+  auto [data, in, out] = zpp::bits::data_in_out();
+
+  extent e{100, 200};
+
+  out(e).or_throw();
+  extent e2{};
+  in(e2).or_throw();
+
+  CHECK(e == e2);
+}
+
+TEST_CASE("extent_tree::node serialization") {
+  auto [data, in, out] = zpp::bits::data_in_out();
+
+  extent_tree::node n{100, 200, 1024, 2};
+  out(n).or_throw();
+
+  extent_tree::node n2{};
+  in(n2).or_throw();
+
+  CHECK(n == n2);
+}
+
+TEST_CASE("extent_tree serialization") {
+  auto [data, in, out] = zpp::bits::data_in_out();
+
+  extent_tree tree;
+  tree.add(0, 1, 0, 0);
+  tree.add(1, 11, 101, 0);
+  tree.add(20, 31, 20, 0);
+  tree.add(31, 41, 131, 0);
+
+  out(tree).or_throw();
+
+  extent_tree tree2;
+  in(tree2).or_throw();
+
+  CHECK(std::equal(tree.begin(), tree.end(), tree2.begin(), tree2.end()));
+}

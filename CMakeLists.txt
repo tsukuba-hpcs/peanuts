@@ -94,6 +94,18 @@ pkg_check_modules(
   liburing
 )
 
+# external dependencies
+add_library(zpp_bits INTERFACE)
+add_library(${PROJECT_NAME}::zpp_bits ALIAS zpp_bits)
+target_include_directories(
+  zpp_bits INTERFACE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/external/zpp_bits>"
+                     "$<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>"
+)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/zpp_bits/zpp_bits.h
+        DESTINATION include/${PROJECT_NAME}-${PROJECT_VERSION}
+)
+install(TARGETS zpp_bits EXPORT ${PROJECT_NAME}Targets)
+
 # ---- headers ----
 file(
   GLOB_RECURSE
@@ -110,7 +122,11 @@ target_include_directories(
                             "$<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>"
 )
 target_link_libraries(
-  ${PROJECT_NAME} INTERFACE MPI::MPI_CXX PkgConfig::Libpmem2 PkgConfig::Liburing
+  ${PROJECT_NAME}
+  INTERFACE MPI::MPI_CXX
+            PkgConfig::Libpmem2
+            PkgConfig::Liburing
+            ${PROJECT_NAME}::zpp_bits
 )
 
 include(cmake/version.cmake)

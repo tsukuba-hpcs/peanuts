@@ -1,0 +1,4 @@
+[submodule "external/zpp_bits"]
+	path = external/zpp_bits
+	url = https://github.com/range3/zpp_bits.git
+  update = merge

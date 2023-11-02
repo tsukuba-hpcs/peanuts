@@ -7,13 +7,17 @@
 #include <set>
 
 #include "inspector.hpp"
+#include "zpp_bits.h"
 
 namespace rpmbb {
 
 struct extent {
-  uint64_t begin;
-  uint64_t end;
+  uint64_t begin{};
+  uint64_t end{};
 
+  using serialize = zpp::bits::members<2>;
+
+  extent() = default;
   explicit extent(uint64_t begin, uint64_t end) : begin(begin), end(end) {
     assert(begin <= end);
   }
@@ -53,6 +57,9 @@ class extent_tree {
     uint64_t ptr;
     int client_id;
 
+    using serialize = zpp::bits::members<3>;
+
+    node() = default;
     node(uint64_t begin, uint64_t end, uint64_t ptr, int client_id)
         : ex(begin, end), ptr(ptr), client_id(client_id) {}
 
@@ -86,6 +93,8 @@ class extent_tree {
   };
 
   std::set<node, comparator> nodes_;
+
+  using serialize = zpp::bits::members<1>;
 
   using iterator = std::set<node>::iterator;
   using const_iterator = std::set<node>::const_iterator;
