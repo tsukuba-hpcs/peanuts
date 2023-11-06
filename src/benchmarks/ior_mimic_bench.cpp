@@ -4,6 +4,7 @@
 
 #include <fmt/chrono.h>
 #include <fmt/core.h>
+#include <zpp_bits.h>
 #include <cxxopts.hpp>
 #include <nlohmann/json.hpp>
 
@@ -29,6 +30,7 @@ struct bench_params {
   size_t segment_count;
   size_t io_size_per_proc;
   std::optional<std::seed_seq::result_type> verify_seed;
+  bool verbose = false;
 
   bench_params(const cxxopts::ParseResult& parsed)
       : pmem(parsed["pmem"].as<std::string>()),
@@ -42,7 +44,8 @@ struct bench_params {
         verify_seed(parsed.count("verify") != 0U
                         ? std::optional<std::seed_seq::result_type>(
                               parsed["verify"].as<std::seed_seq::result_type>())
-                        : std::nullopt)
+                        : std::nullopt),
+        verbose(parsed.count("verbose") != 0U)
 
   {
     if (block_size % xfer_size != 0) {
@@ -50,6 +53,8 @@ struct bench_params {
           "block_size must be a multiple of transfer_size");
     }
   }
+
+  size_t io_count_per_proc() const { return io_size_per_proc / xfer_size; }
 };
 
 namespace nlohmann {
@@ -144,6 +149,7 @@ auto main(int argc, char* argv[]) -> int try {
   options.add_options()
     ("h,help", "Print usage")
     ("V,version", "Print version")
+    ("verbose", "output verbose information to stderr")
     ("prettify", "Prettify output")
     ("o,outdir", "output directory", cxxopts::value<std::string>()->default_value("."))
     ("pmem", "path to pmem device", cxxopts::value<std::string>()->default_value("/dev/dax0.0"))
@@ -167,16 +173,17 @@ auto main(int argc, char* argv[]) -> int try {
 
   auto params = bench_params{parsed};
 
-  mpi::run_on_rank0([&] {
-    std::cout << std::setw(2) << utils::make_inspector(params) << std::endl;
-  });
+  if (params.verbose) {
+    mpi::run_on_rank0([&] {
+      std::cerr << std::setw(2) << utils::make_inspector(params) << std::endl;
+    });
+  }
 
   auto topo = rpmbb::topology{};
   auto rpm = rpmbb::rpm{topo, params.pmem,
                         params.io_size_per_proc * topo.intra_size()};
   auto ring = rpmbb::ring_buffer{rpm};
   auto store = rpmbb::bb_store{rpm};
-
 
   int shift_unit = -1;
   mpi::run_on_rank0([&] {
@@ -190,18 +197,26 @@ auto main(int argc, char* argv[]) -> int try {
   });
   topo.comm().broadcast(shift_unit);
 
+  auto sw = utils::stopwatch<double>();
+  auto result_json = ordered_json{};
 
   // N-1 file path
   auto test_file_path = params.output_dir + "/test_file";
 
+  sw.reset();
+  topo.comm().barrier();
+
   // FIXME: should not open file by each process
   auto fd = raii::file_descriptor{
       ::open(test_file_path.c_str(), O_RDWR | O_CREAT, 0644)};
-  auto ino = utils::get_ino(fd.get());
+  // auto ino = utils::get_ino(fd.get());
 
-  fmt::print("{}: ino: {}\n", topo.rank(), ino);
+  // fmt::print("{}: ino: {}\n", topo.rank(), ino);
 
   auto handler = store.open(fd.get());
+
+  topo.comm().barrier();
+  result_json["time_open"] = sw.get().count();
 
   // writing
   auto my_seed = params.verify_seed.value_or(0) + topo.rank();
@@ -211,6 +226,9 @@ auto main(int argc, char* argv[]) -> int try {
 
   auto iter_count = params.block_size / params.xfer_size;
   auto segment_size = params.block_size * topo.size();
+  topo.comm().barrier();
+  sw.reset();
+  topo.comm().barrier();
   for (size_t s = 0; s < params.segment_count; ++s) {
     auto segment_ofs = segment_size * s;
     auto block_ofs = segment_ofs + params.block_size * topo.rank();
@@ -227,30 +245,125 @@ auto main(int argc, char* argv[]) -> int try {
     }
   }
 
-  // sync extent tree
+  topo.comm().barrier();
+  result_json["write"] =
+      bench_stats{sw.get(), params.io_count_per_proc() * topo.size(),
+                  params.io_size_per_proc * topo.size()};
+  topo.comm().barrier();
+  sw.reset();
+  topo.comm().barrier();
 
+  // serialize local extent tree
+  auto [send_data, out] = zpp::bits::data_out();
+  out(handler->bb_ref().local_tree_).or_throw();
 
+  topo.comm().barrier();
+  result_json["time_serialize"] = sw.lap_time().count();
+  topo.comm().barrier();
+
+  // allgather serialized extent tree size
+  std::vector<int> extent_tree_sizes(topo.size());
+  topo.comm().all_gather(static_cast<int>(send_data.size()),
+                         std::span{extent_tree_sizes});
+
+  // all_gather_v serialized extent tree
+  auto [recv_data, in] = zpp::bits::data_in();
+  recv_data.resize(std::accumulate(extent_tree_sizes.begin(),
+                                   extent_tree_sizes.end(), 0ULL));
+  topo.comm().all_gather_v(std::as_bytes(std::span{send_data}),
+                           std::as_writable_bytes(std::span{recv_data}),
+                           std::span{extent_tree_sizes});
+
+  topo.comm().barrier();
+  result_json["time_allgather"] = sw.lap_time().count();
+  topo.comm().barrier();
+
+  // deserialize extent trees
+  in(handler->bb_ref().global_tree_).or_throw();
+
+  topo.comm().barrier();
+  result_json["time_deserialize"] = sw.lap_time().count();
+  topo.comm().barrier();
+
+  // FIXME: inefficient merge
+  extent_tree tmp_tree;
+  for (size_t i = 1; i < extent_tree_sizes.size(); ++i) {
+    in(tmp_tree).or_throw();
+    handler->bb_ref().global_tree_.merge(tmp_tree);
+  }
+
+  topo.comm().barrier();
+  result_json["time_merge"] = sw.lap_time().count();
+  result_json["time_sync"] = sw.get().count();
+  result_json["memory_usage"] = memory_usage::get_current_rss_kb();
+
+  if (params.verbose) {
+    mpi::run_on_rank0([&] {
+      std::cerr << utils::to_string(handler->bb_ref().global_tree_)
+                << std::endl;
+    });
+  }
+
+  topo.comm().barrier();
+  sw.reset();
+  topo.comm().barrier();
 
   // reading
-  // auto target_rank = (topo.rank() + shift_unit) % topo.size();
-  // for(size_t s = 0; s < params.segment_count; ++s) {
-  //   auto segment_ofs = segment_size * s;
-  //   auto block_ofs = segment_ofs + params.block_size * target_rank;
-  //   auto ofs = block_ofs;
-  //   for (size_t i = 0; i < iter_count; ++i) {
-  //     auto lsn = handler->bb_ref().local_tree_.find(ofs, ofs + params.xfer_size);
-  //     if (!lsn) {
-  //       throw std::runtime_error("lsn not found");
-  //     }
-  //     ring.pread(xfer_buffer_span, *lsn);
-  //     ofs += params.xfer_size;
-  //   }
+  auto& global_tree = handler->bb_ref().global_tree_;
+  auto target_rank = (topo.rank() + shift_unit) % topo.size();
+  for (size_t s = 0; s < params.segment_count; ++s) {
+    auto segment_ofs = segment_size * s;
+    auto block_ofs = segment_ofs + params.block_size * target_rank;
+    auto ofs = block_ofs;
+    for (size_t i = 0; i < iter_count; ++i) {
+      auto it = global_tree.find(ofs, ofs + params.xfer_size);
+      // mpi::run_on_rank0([&] {
+      //   if (it == global_tree.end()) {
+      //     fmt::print("extent not found: ofs: {}, size: {}\n", ofs,
+      //                params.xfer_size);
+      //   } else {
+      //     fmt::print("ofs: {}, size: {}, extent: {}\n", ofs,
+      //     params.xfer_size,
+      //                utils::to_string(*it));
+      //   }
+      // });
 
-  // }
+      // read extent(s) and fill xfer_buffer_span
+      size_t rpos = 0;
+      while (rpos < params.xfer_size) {
+        if (it == global_tree.end()) {
+          throw std::runtime_error(
+              fmt::format("extent not found: ofs: {}, size: {}", ofs + rpos,
+                          params.xfer_size - rpos));
+        }
+        if (it->ex.begin > ofs + rpos) {
+          throw std::runtime_error(
+              fmt::format("io error: ofs: {}", ofs + rpos));
+        }
 
+        auto ofs_in_extent = ofs + rpos - it->ex.begin;
+        auto rlsn = it->ptr + ofs_in_extent;
+        auto rsize =
+            std::min(it->ex.end - (ofs + rpos), params.xfer_size - rpos);
+        // mpi::run_on_rank0([&] {
+        //   fmt::print("{}: pread: buf(ofs{}, size{}), from rank {}, ofs {}\n",
+        //              topo.rank(), rpos, rsize, it->client_id,
+        //              ring.to_ofs(rlsn));
+        // });
+        rpm.pread(xfer_buffer_span.subspan(rpos, rsize), it->client_id,
+                  ring.to_ofs(rlsn));
+        ++it;
+        rpos += rsize;
+      }
 
+      ofs += params.xfer_size;
+    }
+  }
 
-
+  topo.comm().barrier();
+  result_json["read"] =
+      bench_stats{sw.get(), params.io_count_per_proc() * topo.size(),
+                  params.io_size_per_proc * topo.size()};
 
   // output json
   mpi::run_on_rank0([&] {
@@ -261,6 +374,7 @@ auto main(int argc, char* argv[]) -> int try {
         {"version", RPMBB_VERSION},
     };
     j.merge_patch(ordered_json(params));
+    j.merge_patch(result_json);
     std::cout << j << std::endl;
   });
 

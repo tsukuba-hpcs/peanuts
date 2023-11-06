@@ -56,6 +56,10 @@ class ring_buffer {
   size_t size() const { return tracker_.ring_size(); }
   lsn_t head() const { return tracker_.head(); }
   lsn_t tail() const { return tracker_.tail(); }
+  uint64_t to_ofs(lsn_t lsn) const { return tracker_.to_ofs(lsn); }
+  static constexpr uint64_t to_ofs(lsn_t lsn, size_t ring_size) {
+    return ring_tracker::to_ofs(lsn, ring_size);
+  }
 
   auto pread(std::span<std::byte> buf, lsn_t lsn) const -> void {
     auto ofs = tracker_.to_ofs(lsn);

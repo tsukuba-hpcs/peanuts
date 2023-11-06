@@ -123,66 +123,25 @@ class extent_tree {
     return it;
   }
 
+  void merge(const extent_tree& other) {
+    static comparator comp;
+
+    auto in_it = other.nodes_.begin();
+    if (in_it == other.nodes_.end()) {
+      return;
+    }
+    auto out_it = nodes_.lower_bound(*in_it);
+    for (; in_it != other.nodes_.end(); ++in_it) {
+      out_it = do_insert(out_it, *in_it);
+      while (out_it != nodes_.end() && !comp(*in_it, *out_it)) {
+        ++out_it;
+      }
+    }
+  }
+
   void add(uint64_t begin, uint64_t end, uint64_t ptr, int client_id) {
-    node new_node(begin, end, ptr, client_id);
-    auto it = nodes_.lower_bound(new_node);
-
-    while (it != nodes_.end() && new_node.overlaps(*it)) {
-      auto non_overlapping = it->get_non_overlapping(new_node);
-      if (non_overlapping.has_value()) {
-        if (non_overlapping->ex.end < it->ex.end) {
-          // Overlap rear part of existing node
-          // check if there is a non-overlapping rear part
-          auto remaining =
-              node(non_overlapping->ex.end, it->ex.end,
-                   it->ptr + (non_overlapping->ex.end - it->ex.begin),
-                   it->client_id);
-
-          assert(remaining.overlaps(new_node));
-
-          // remove existing node first
-          it = nodes_.erase(it);
-
-          auto non_overlapping_rear = remaining.get_non_overlapping(new_node);
-          if (non_overlapping_rear.has_value()) {
-            it = nodes_.insert(it, *non_overlapping_rear);
-          }
-        } else {
-          // Overlap only front part of existing node
-          it = nodes_.erase(it);
-        }
-
-        nodes_.insert(it, *non_overlapping);
-      } else {
-        // Overlap overall
-        it = nodes_.erase(it);
-      }
-    }
-
-    it = nodes_.insert(it, new_node);
-
-    // coalesce with previous node
-    if (auto prev = it; prev != nodes_.begin()) {
-      --prev;
-      if (prev->client_id == it->client_id && prev->ex.end == it->ex.begin &&
-          prev->ptr + prev->ex.size() == it->ptr) {
-        node coalesced(prev->ex.begin, it->ex.end, prev->ptr, prev->client_id);
-        nodes_.erase(prev);
-        it = nodes_.erase(it);
-        it = nodes_.insert(it, coalesced);
-      }
-    }
-
-    // coalesce with next node
-    if (auto next = it; ++next != nodes_.end()) {
-      if (next->client_id == it->client_id && next->ex.begin == it->ex.end &&
-          next->ptr == it->ptr + it->ex.size()) {
-        node coalesced(it->ex.begin, next->ex.end, it->ptr, it->client_id);
-        nodes_.erase(it);
-        it = nodes_.erase(next);
-        nodes_.insert(it, coalesced);
-      }
-    }
+    auto new_node = node{begin, end, ptr, client_id};
+    do_insert(nodes_.lower_bound(new_node), new_node);
   }
 
   void remove(uint64_t begin, uint64_t end) {
@@ -228,6 +187,67 @@ class extent_tree {
       os << utils::make_inspector(node);
     }
     return os;
+  }
+
+ private:
+  iterator do_insert(iterator it, const node& value) {
+    while (it != nodes_.end() && value.overlaps(*it)) {
+      auto non_overlapping = it->get_non_overlapping(value);
+      if (non_overlapping.has_value()) {
+        if (non_overlapping->ex.end < it->ex.end) {
+          // Overlap rear part of existing node
+          // check if there is a non-overlapping rear part
+          auto remaining =
+              node(non_overlapping->ex.end, it->ex.end,
+                   it->ptr + (non_overlapping->ex.end - it->ex.begin),
+                   it->client_id);
+
+          assert(remaining.overlaps(value));
+
+          // remove existing node first
+          it = nodes_.erase(it);
+
+          auto non_overlapping_rear = remaining.get_non_overlapping(value);
+          if (non_overlapping_rear.has_value()) {
+            it = nodes_.insert(it, *non_overlapping_rear);
+          }
+        } else {
+          // Overlap only front part of existing node
+          it = nodes_.erase(it);
+        }
+
+        nodes_.insert(it, *non_overlapping);
+      } else {
+        // Overlap overall
+        it = nodes_.erase(it);
+      }
+    }
+
+    it = nodes_.insert(it, value);
+
+    // coalesce with previous node
+    if (auto prev = it; prev != nodes_.begin()) {
+      --prev;
+      if (prev->client_id == it->client_id && prev->ex.end == it->ex.begin &&
+          prev->ptr + prev->ex.size() == it->ptr) {
+        node coalesced(prev->ex.begin, it->ex.end, prev->ptr, prev->client_id);
+        nodes_.erase(prev);
+        it = nodes_.erase(it);
+        it = nodes_.insert(it, coalesced);
+      }
+    }
+
+    // coalesce with next node
+    if (auto next = it; ++next != nodes_.end()) {
+      if (next->client_id == it->client_id && next->ex.begin == it->ex.end &&
+          next->ptr == it->ptr + it->ex.size()) {
+        node coalesced(it->ex.begin, next->ex.end, it->ptr, it->client_id);
+        nodes_.erase(it);
+        it = nodes_.erase(next);
+        it = nodes_.insert(it, coalesced);
+      }
+    }
+    return it;
   }
 };
 

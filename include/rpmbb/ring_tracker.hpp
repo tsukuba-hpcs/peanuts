@@ -44,7 +44,10 @@ class ring_tracker {
     return (ofs + size) > ring_size_;
   }
 
-  uint64_t to_ofs(uint64_t lsn) const { return lsn % ring_size_; }
+  static constexpr uint64_t to_ofs(lsn_t lsn, size_t ring_size) {
+    return lsn % ring_size;
+  }
+  uint64_t to_ofs(lsn_t lsn) const { return to_ofs(lsn, ring_size_); }
 
   size_t used_capacity() const { return head_lsn_ - tail_lsn_; }
   size_t free_capacity() const { return ring_size_ - used_capacity(); }

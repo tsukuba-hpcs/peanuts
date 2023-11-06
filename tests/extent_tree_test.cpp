@@ -257,9 +257,51 @@ TEST_CASE("extent_tree serialization") {
   tree.add(31, 41, 131, 0);
 
   out(tree).or_throw();
+  out(tree).or_throw();
 
   extent_tree tree2;
   in(tree2).or_throw();
-
   CHECK(std::equal(tree.begin(), tree.end(), tree2.begin(), tree2.end()));
+
+  in(tree2).or_throw();
+  CHECK(std::equal(tree.begin(), tree.end(), tree2.begin(), tree2.end()));
+}
+
+TEST_CASE("Testing extent_tree::merge") {
+  extent_tree tree1;
+  tree1.add(0, 100, 1000, 1);
+  tree1.add(200, 300, 2000, 2);
+  CHECK(utils::to_string(tree1) == "[0-100:1000:1][200-300:2000:2]");
+
+  extent_tree tree2;
+  tree2.add(100, 200, 1100, 1);
+  tree2.add(300, 400, 2100, 2);
+  CHECK(utils::to_string(tree2) == "[100-200:1100:1][300-400:2100:2]");
+
+  // Case 1: Non-overlapping merge
+  tree1.merge(tree2);
+  CHECK(utils::to_string(tree1) == "[0-200:1000:1][200-400:2000:2]");
+  CHECK(tree1.size() == 2);
+
+  // Case 2: Overlapping merge with different client_ids
+  extent_tree tree3;
+  tree3.add(50, 150, 1050, 3);
+  tree1.merge(tree3);
+  CHECK(utils::to_string(tree1) == "[0-50:1000:1][50-150:1050:3][150-200:1150:1][200-400:2000:2]");
+  CHECK(tree1.size() == 4);
+
+  // Case 3: Overlapping merge with same client_ids should coalesce
+  extent_tree tree4;
+  tree4.add(400, 500, 2200, 2);
+  tree1.merge(tree4);
+  CHECK(utils::to_string(tree1) == "[0-50:1000:1][50-150:1050:3][150-200:1150:1][200-500:2000:2]");
+  CHECK(tree1.size() == 4);
+
+  // Case 4: Partially overlapping merge
+  extent_tree tree5;
+  tree5.add(250, 350, 2050, 4);
+  tree1.merge(tree5);
+  CHECK(utils::to_string(tree1) == "[0-50:1000:1][50-150:1050:3][150-200:1150:1][200-250:2000:2][250-350:2050:4][350-500:2150:2]");
+  CHECK(tree1.size() == 6);
+
 }
