@@ -4,6 +4,7 @@
 #include "rpmbb/bb.hpp"
 #include "rpmbb/raii/fd.hpp"
 #include "rpmbb/rpm.hpp"
+#include "rpmbb/ring_buffer.hpp"
 #include "rpmbb/topology.hpp"
 #include "rpmbb/utils/fs.hpp"
 using namespace rpmbb;
