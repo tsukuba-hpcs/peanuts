@@ -2,6 +2,10 @@
 License: MIT  
 https://github.com/eyalz800/zpp_bits/blob/main/LICENSE
 
+# eyalz800/zpp_file
+License: MIT  
+https://github.com/eyalz800/zpp_file/blob/075b10acf4632b5fd5409aa6f237f65db1bf1da3/LICENSE
+
 # LLNL/UnifyFS
 License: LLNL-CODE-741539  
 

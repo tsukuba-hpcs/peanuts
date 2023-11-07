@@ -112,6 +112,7 @@ file(
   headers
   CONFIGURE_DEPENDS
   "${PROJECT_SOURCE_DIR}/include/*.hpp"
+  "${PROJECT_SOURCE_DIR}/include/*.h"
 )
 add_library(${PROJECT_NAME} INTERFACE ${headers})
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
