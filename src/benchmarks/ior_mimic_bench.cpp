@@ -212,8 +212,17 @@ auto main(int argc, char* argv[]) -> int try {
   topo.comm().barrier();
 
   // FIXME: should not open file by each process
-  auto file = zpp::filesystem::open(
-      test_file_path, zpp::filesystem::open_mode::read_write_create);
+  zpp::filesystem::file file;
+  mpi::run_on_rank0([&] {
+    file = zpp::filesystem::file(zpp::filesystem::file_handle{
+        ::open(test_file_path.c_str(), O_RDWR | O_CREAT, 0644)});
+  });
+  topo.comm().barrier();
+
+  if (topo.rank() != 0) {
+    file = zpp::filesystem::open(test_file_path,
+                                 zpp::filesystem::open_mode::read_write);
+  }
 
   auto handler = store.open(file.get());
 
