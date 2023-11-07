@@ -179,6 +179,13 @@ auto main(int argc, char* argv[]) -> int try {
     });
   }
 
+  auto sw = utils::stopwatch<double>();
+  auto result_json = ordered_json{};
+  auto memory_json = ordered_json{};
+  auto time_json = ordered_json{};
+  auto tree_size_json = ordered_json{};
+  memory_json["memory_start"] = memory_usage::get_current_rss_kb();
+
   auto topo = rpmbb::topology{};
   auto rpm = rpmbb::rpm{topo, params.pmem,
                         params.io_size_per_proc * topo.intra_size()};
@@ -197,9 +204,6 @@ auto main(int argc, char* argv[]) -> int try {
   });
   topo.comm().broadcast(shift_unit);
 
-  auto sw = utils::stopwatch<double>();
-  auto result_json = ordered_json{};
-
   // N-1 file path
   auto test_file_path = params.output_dir + "/test_file";
 
@@ -216,7 +220,8 @@ auto main(int argc, char* argv[]) -> int try {
   auto handler = store.open(fd.get());
 
   topo.comm().barrier();
-  result_json["time_open"] = sw.get().count();
+  time_json["time_open"] = sw.get().count();
+  memory_json["memory_open"] = memory_usage::get_current_rss_kb();
 
   // writing
   auto my_seed = params.verify_seed.value_or(0) + topo.rank();
@@ -229,19 +234,41 @@ auto main(int argc, char* argv[]) -> int try {
   topo.comm().barrier();
   sw.reset();
   topo.comm().barrier();
-  for (size_t s = 0; s < params.segment_count; ++s) {
-    auto segment_ofs = segment_size * s;
-    auto block_ofs = segment_ofs + params.block_size * topo.rank();
-    auto ofs = block_ofs;
-    for (size_t i = 0; i < iter_count; ++i) {
-      auto lsn = ring.reserve_nb(params.xfer_size);
-      if (!lsn) {
-        throw std::runtime_error("ring buffer is full");
+  if (!params.verify_seed) {
+    for (size_t s = 0; s < params.segment_count; ++s) {
+      auto segment_ofs = segment_size * s;
+      auto block_ofs = segment_ofs + params.block_size * topo.rank();
+      auto ofs = block_ofs;
+      for (size_t i = 0; i < iter_count; ++i) {
+        auto lsn = ring.reserve_nb(params.xfer_size);
+        if (!lsn) {
+          throw std::runtime_error("ring buffer is full");
+        }
+        ring.pwrite(xfer_buffer_span, *lsn);
+        handler->bb_ref().local_tree_.add(ofs, ofs + params.xfer_size, *lsn,
+                                          topo.rank());
+        ofs += params.xfer_size;
       }
-      ring.pwrite(xfer_buffer_span, *lsn);
-      handler->bb_ref().local_tree_.add(ofs, ofs + params.xfer_size, *lsn,
-                                        topo.rank());
-      ofs += params.xfer_size;
+    }
+  } else {
+    // verify mode
+    for (size_t s = 0; s < params.segment_count; ++s) {
+      auto segment_ofs = segment_size * s;
+      auto block_ofs = segment_ofs + params.block_size * topo.rank();
+      auto ofs = block_ofs;
+      for (size_t i = 0; i < iter_count; ++i) {
+        auto lsn = ring.reserve_nb(params.xfer_size);
+        if (!lsn) {
+          throw std::runtime_error("ring buffer is full");
+        }
+        ring.pwrite(xfer_buffer_span, *lsn);
+        handler->bb_ref().local_tree_.add(ofs, ofs + params.xfer_size, *lsn,
+                                          topo.rank());
+        ofs += params.xfer_size;
+        random_data_buffer = rsg.generate(params.xfer_size);
+        xfer_buffer_span =
+            std::as_writable_bytes(std::span{random_data_buffer});
+      }
     }
   }
 
@@ -249,6 +276,8 @@ auto main(int argc, char* argv[]) -> int try {
   result_json["write"] =
       bench_stats{sw.get(), params.io_count_per_proc() * topo.size(),
                   params.io_size_per_proc * topo.size()};
+  memory_json["memory_write"] = memory_usage::get_current_rss_kb();
+  tree_size_json["tree_size_local"] = handler->bb_ref().local_tree_.size();
   topo.comm().barrier();
   sw.reset();
   topo.comm().barrier();
@@ -258,7 +287,7 @@ auto main(int argc, char* argv[]) -> int try {
   out(handler->bb_ref().local_tree_).or_throw();
 
   topo.comm().barrier();
-  result_json["time_serialize"] = sw.lap_time().count();
+  time_json["time_serialize"] = sw.lap_time().count();
   topo.comm().barrier();
 
   // allgather serialized extent tree size
@@ -275,14 +304,14 @@ auto main(int argc, char* argv[]) -> int try {
                            std::span{extent_tree_sizes});
 
   topo.comm().barrier();
-  result_json["time_allgather"] = sw.lap_time().count();
+  time_json["time_allgather"] = sw.lap_time().count();
   topo.comm().barrier();
 
   // deserialize extent trees
   in(handler->bb_ref().global_tree_).or_throw();
 
   topo.comm().barrier();
-  result_json["time_deserialize"] = sw.lap_time().count();
+  time_json["time_deserialize"] = sw.lap_time().count();
   topo.comm().barrier();
 
   // FIXME: inefficient merge
@@ -293,9 +322,10 @@ auto main(int argc, char* argv[]) -> int try {
   }
 
   topo.comm().barrier();
-  result_json["time_merge"] = sw.lap_time().count();
-  result_json["time_sync"] = sw.get().count();
-  result_json["memory_usage"] = memory_usage::get_current_rss_kb();
+  time_json["time_merge"] = sw.lap_time().count();
+  time_json["time_sync"] = sw.get().count();
+  memory_json["memory_sync"] = memory_usage::get_current_rss_kb();
+  tree_size_json["tree_size_global"] = handler->bb_ref().global_tree_.size();
 
   if (params.verbose) {
     mpi::run_on_rank0([&] {
@@ -311,52 +341,85 @@ auto main(int argc, char* argv[]) -> int try {
   // reading
   auto& global_tree = handler->bb_ref().global_tree_;
   auto target_rank = (topo.rank() + shift_unit) % topo.size();
-  for (size_t s = 0; s < params.segment_count; ++s) {
-    auto segment_ofs = segment_size * s;
-    auto block_ofs = segment_ofs + params.block_size * target_rank;
-    auto ofs = block_ofs;
-    for (size_t i = 0; i < iter_count; ++i) {
-      auto it = global_tree.find(ofs, ofs + params.xfer_size);
-      // mpi::run_on_rank0([&] {
-      //   if (it == global_tree.end()) {
-      //     fmt::print("extent not found: ofs: {}, size: {}\n", ofs,
-      //                params.xfer_size);
-      //   } else {
-      //     fmt::print("ofs: {}, size: {}, extent: {}\n", ofs,
-      //     params.xfer_size,
-      //                utils::to_string(*it));
-      //   }
-      // });
+  if (!params.verify_seed) {
+    for (size_t s = 0; s < params.segment_count; ++s) {
+      auto segment_ofs = segment_size * s;
+      auto block_ofs = segment_ofs + params.block_size * target_rank;
+      auto ofs = block_ofs;
+      for (size_t i = 0; i < iter_count; ++i) {
+        auto it = global_tree.find(ofs, ofs + params.xfer_size);
 
-      // read extent(s) and fill xfer_buffer_span
-      size_t rpos = 0;
-      while (rpos < params.xfer_size) {
-        if (it == global_tree.end()) {
-          throw std::runtime_error(
-              fmt::format("extent not found: ofs: {}, size: {}", ofs + rpos,
-                          params.xfer_size - rpos));
-        }
-        if (it->ex.begin > ofs + rpos) {
-          throw std::runtime_error(
-              fmt::format("io error: ofs: {}", ofs + rpos));
-        }
+        // read extent(s) and fill xfer_buffer_span
+        size_t rpos = 0;
+        while (rpos < params.xfer_size) {
+          if (it == global_tree.end()) {
+            throw std::runtime_error(
+                fmt::format("extent not found: ofs: {}, size: {}", ofs + rpos,
+                            params.xfer_size - rpos));
+          }
+          if (it->ex.begin > ofs + rpos) {
+            throw std::runtime_error(
+                fmt::format("io error: ofs: {}", ofs + rpos));
+          }
 
-        auto ofs_in_extent = ofs + rpos - it->ex.begin;
-        auto rlsn = it->ptr + ofs_in_extent;
-        auto rsize =
-            std::min(it->ex.end - (ofs + rpos), params.xfer_size - rpos);
-        // mpi::run_on_rank0([&] {
-        //   fmt::print("{}: pread: buf(ofs{}, size{}), from rank {}, ofs {}\n",
-        //              topo.rank(), rpos, rsize, it->client_id,
-        //              ring.to_ofs(rlsn));
-        // });
-        rpm.pread(xfer_buffer_span.subspan(rpos, rsize), it->client_id,
-                  ring.to_ofs(rlsn));
-        ++it;
-        rpos += rsize;
+          auto ofs_in_extent = ofs + rpos - it->ex.begin;
+          auto rlsn = it->ptr + ofs_in_extent;
+          auto rsize =
+              std::min(it->ex.end - (ofs + rpos), params.xfer_size - rpos);
+          rpm.pread(xfer_buffer_span.subspan(rpos, rsize), it->client_id,
+                    ring.to_ofs(rlsn));
+          ++it;
+          rpos += rsize;
+        }
+        ofs += params.xfer_size;
       }
+    }
+  } else {
+    // verify mode
+    auto target_seed = params.verify_seed.value() + target_rank;
+    rsg = utils::random_string_generator{target_seed};
+    for (size_t s = 0; s < params.segment_count; ++s) {
+      auto segment_ofs = segment_size * s;
+      auto block_ofs = segment_ofs + params.block_size * target_rank;
+      auto ofs = block_ofs;
+      for (size_t i = 0; i < iter_count; ++i) {
+        auto it = global_tree.find(ofs, ofs + params.xfer_size);
 
-      ofs += params.xfer_size;
+        // read extent(s) and fill xfer_buffer_span
+        size_t rpos = 0;
+        while (rpos < params.xfer_size) {
+          if (it == global_tree.end()) {
+            throw std::runtime_error(
+                fmt::format("extent not found: ofs: {}, size: {}", ofs + rpos,
+                            params.xfer_size - rpos));
+          }
+          if (it->ex.begin > ofs + rpos) {
+            throw std::runtime_error(
+                fmt::format("io error: ofs: {}", ofs + rpos));
+          }
+
+          auto ofs_in_extent = ofs + rpos - it->ex.begin;
+          auto rlsn = it->ptr + ofs_in_extent;
+          auto rsize =
+              std::min(it->ex.end - (ofs + rpos), params.xfer_size - rpos);
+          rpm.pread(xfer_buffer_span.subspan(rpos, rsize), it->client_id,
+                    ring.to_ofs(rlsn));
+          ++it;
+          rpos += rsize;
+        }
+        auto expected_random_data_buffer = rsg.generate(params.xfer_size);
+        auto expected_span =
+            std::as_bytes(std::span{expected_random_data_buffer});
+        if (!std::equal(xfer_buffer_span.begin(), xfer_buffer_span.end(),
+                        expected_span.begin(), expected_span.end())) {
+          fmt::print(stderr,
+                     "verification error on rank "
+                     "{} : ofs = {}, read = {}, expected_read = {}\n ",
+                     topo.rank(), ofs, to_string(xfer_buffer_span).substr(0, 8),
+                     expected_random_data_buffer.substr(0, 8));
+        }
+        ofs += params.xfer_size;
+      }
     }
   }
 
@@ -364,6 +427,7 @@ auto main(int argc, char* argv[]) -> int try {
   result_json["read"] =
       bench_stats{sw.get(), params.io_count_per_proc() * topo.size(),
                   params.io_size_per_proc * topo.size()};
+  memory_json["memory_read"] = memory_usage::get_current_rss_kb();
 
   // output json
   mpi::run_on_rank0([&] {
@@ -375,6 +439,9 @@ auto main(int argc, char* argv[]) -> int try {
     };
     j.merge_patch(ordered_json(params));
     j.merge_patch(result_json);
+    j.merge_patch(time_json);
+    j.merge_patch(memory_json);
+    j.merge_patch(tree_size_json);
     std::cout << j << std::endl;
   });
 
