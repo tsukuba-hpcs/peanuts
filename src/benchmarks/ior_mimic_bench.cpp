@@ -4,6 +4,7 @@
 
 #include <fmt/chrono.h>
 #include <fmt/core.h>
+#include <zpp/file.h>
 #include <zpp_bits.h>
 #include <cxxopts.hpp>
 #include <nlohmann/json.hpp>
@@ -211,13 +212,10 @@ auto main(int argc, char* argv[]) -> int try {
   topo.comm().barrier();
 
   // FIXME: should not open file by each process
-  auto fd = raii::file_descriptor{
-      ::open(test_file_path.c_str(), O_RDWR | O_CREAT, 0644)};
-  // auto ino = utils::get_ino(fd.get());
+  auto file = zpp::filesystem::open(test_file_path,
+                                    zpp::filesystem::open_mode::read_write);
 
-  // fmt::print("{}: ino: {}\n", topo.rank(), ino);
-
-  auto handler = store.open(fd.get());
+  auto handler = store.open(file.get());
 
   topo.comm().barrier();
   time_json["time_open"] = sw.get().count();
@@ -436,6 +434,9 @@ auto main(int argc, char* argv[]) -> int try {
     }
     ordered_json j = {
         {"version", RPMBB_VERSION},
+        {"np", topo.np()},
+        {"nnodes", topo.nnodes()},
+        {"max_ppn", topo.max_ppn()},
     };
     j.merge_patch(ordered_json(params));
     j.merge_patch(result_json);

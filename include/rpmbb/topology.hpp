@@ -37,7 +37,8 @@ class topology {
         inter_comm_{comm_, intra_comm_.rank()},
         rank_map_{create_rank_map()},
         inverted_rank_map_{create_inverted_rank_map()},
-        cached_nnodes_{count_nnodes()} {}
+        cached_nnodes_{count_nnodes()},
+        cached_max_ppn_{count_max_ppn()} {}
 
   auto comm() const -> const mpi::comm& { return comm_; }
   auto intra_comm() const -> const mpi::comm& { return intra_comm_; }
@@ -51,6 +52,7 @@ class topology {
   auto inter_size() const -> int { return inter_comm_.size(); }
   auto np() const -> int { return size(); }
   auto nnodes() const -> size_t { return cached_nnodes_; }
+  auto max_ppn() const -> size_t { return cached_max_ppn_; }
 
   auto global2inter_rank(const int global_rank) const -> int {
     return rank_map_[global_rank].inter;
@@ -112,6 +114,17 @@ class topology {
     return unique_elements.size();
   }
 
+  auto count_max_ppn() const -> size_t {
+    std::unordered_map<int, size_t> ppn;
+    for (const auto& pair : rank_map_) {
+      ppn[pair.inter]++;
+    }
+    return std::max_element(
+               ppn.begin(), ppn.end(),
+               [](const auto& a, const auto& b) { return a.second < b.second; })
+        ->second;
+  }
+
  private:
   mpi::comm comm_;
   mpi::comm intra_comm_;
@@ -119,6 +132,7 @@ class topology {
   std::vector<rank_pair> rank_map_;
   std::map<rank_pair, int> inverted_rank_map_;
   size_t cached_nnodes_;
+  size_t cached_max_ppn_;
 };
 
 }  // namespace rpmbb
