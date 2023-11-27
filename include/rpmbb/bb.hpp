@@ -40,11 +40,13 @@ class bb_handler {
  public:
   bb_handler(std::reference_wrapper<rpmbb::rpm> rpm_ref,
              std::reference_wrapper<ring_buffer> local_ring,
+             std::reference_wrapper<const rpm_blocks> rpm_blocks,
              std::shared_ptr<bb> bb,
              zpp::filesystem::weak_file_handle fd =
                  zpp::filesystem::weak_file::invalid_file_handle)
       : rpm_ref_{rpm_ref},
         local_ring_{local_ring},
+        rpm_blocks_{rpm_blocks},
         bb_{std::move(bb)},
         file_{fd},
         rank_{rpm().topo().rank()} {}
@@ -71,7 +73,7 @@ class bb_handler {
     size_t bytes_read = 0;
     while (bytes_read < buf.size()) {
       if (it == bb_->global_tree.end()) {
-        return bytes_read;
+        break;
       }
 
       auto read_ofs = ofs + bytes_read;
@@ -97,11 +99,12 @@ class bb_handler {
       auto rlsn = it->ptr + ofs_in_extent;
       auto rsize = std::min(buf.size() - bytes_read, it->ex.end - read_ofs);
       // FIXME: need to consider wrapping around
-      // FIXME: use rpm_remote_block
-      rpm().pread(buf.subspan(bytes_read, rsize), it->client_id, ring().to_ofs(rlsn));
+      rpm_blocks_.get().pread_noflush(buf.subspan(bytes_read, rsize),
+                                      it->client_id, ring().to_ofs(rlsn));
       bytes_read += rsize;
       ++it;
     }
+    rpm_blocks_.get().flush();
     return bytes_read;
   }
 
@@ -112,6 +115,7 @@ class bb_handler {
  private:
   std::reference_wrapper<rpmbb::rpm> rpm_ref_;
   std::reference_wrapper<ring_buffer> local_ring_;
+  std::reference_wrapper<const rpm_blocks> rpm_blocks_;
   std::shared_ptr<bb> bb_;
   zpp::filesystem::weak_file file_;
   int rank_;
@@ -119,17 +123,20 @@ class bb_handler {
 
 class bb_store {
  public:
-  bb_store(std::reference_wrapper<rpm> rpm_ref)
-      : rpm_ref_(rpm_ref), local_ring_{rpm_ref_.get()} {}
+  explicit bb_store(std::reference_wrapper<rpm> rpm_ref)
+      : rpm_ref_(rpm_ref),
+        local_ring_{rpm_ref_.get()},
+        rpm_blocks_{rpm_ref_.get()} {}
 
   std::unique_ptr<bb_handler> open(ino_t ino, int fd) {
     auto bb_obj = std::make_shared<bb>(bb{ino});
     auto [it, inserted] = bb_store_.insert(bb_obj);
     if (fd >= 0) {
-      return std::make_unique<bb_handler>(rpm_ref_, std::ref(local_ring_), *it,
-                                          fd);
+      return std::make_unique<bb_handler>(rpm_ref_, std::ref(local_ring_),
+                                          std::cref(rpm_blocks_), *it, fd);
     } else {
-      return std::make_unique<bb_handler>(rpm_ref_, std::ref(local_ring_), *it);
+      return std::make_unique<bb_handler>(rpm_ref_, std::ref(local_ring_),
+                                          std::cref(rpm_blocks_), *it);
     }
   }
 
@@ -144,11 +151,17 @@ class bb_store {
 
   auto local_ring() -> ring_buffer& { return local_ring_; }
 
+  std::ostream& inspect(std::ostream& os) const {
+    os << "rpm_blocks: " << utils::make_inspector(rpm_blocks_) << "\n";
+    return os;
+  }
+
  private:
   std::unordered_set<std::shared_ptr<bb>, detail::bb_hash, detail::bb_equal>
       bb_store_{};
   std::reference_wrapper<rpm> rpm_ref_;
   ring_buffer local_ring_;
+  rpm_blocks rpm_blocks_;
 };
 
 }  // namespace rpmbb

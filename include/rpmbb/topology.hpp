@@ -54,6 +54,13 @@ class topology {
   auto nnodes() const -> size_t { return cached_nnodes_; }
   auto max_ppn() const -> size_t { return cached_max_ppn_; }
 
+  auto is_local(const int global_rank1, const int global_rank2) const -> bool {
+    return global2inter_rank(global_rank1) == global2inter_rank(global_rank2);
+  }
+  auto is_local(const int global_rank) const -> bool {
+    return is_local(global_rank, rank());
+  }
+
   auto global2inter_rank(const int global_rank) const -> int {
     return rank_map_[global_rank].inter;
   }

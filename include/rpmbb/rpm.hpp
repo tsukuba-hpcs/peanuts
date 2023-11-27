@@ -80,6 +80,7 @@ class rpm {
     win_.get(buf, win_target_rank, mpi::aint(ofs));
   }
   auto flush(int win_target_rank) const { win_.flush(win_target_rank); }
+  auto flush_all() const { win_.flush_all(); }
 
   auto pread(std::span<std::byte> buf, int global_rank, off_t ofs) const {
     auto rank = win_target_rank(global_rank);
@@ -195,6 +196,85 @@ class rpm_remote_block {
   std::reference_wrapper<const rpmbb::rpm> rpm_ref_;
   int win_target_rank_ = 0;
   off_t win_block_disp_ = 0;
+};
+
+class rpm_blocks {
+ public:
+  explicit rpm_blocks(const rpm& rpm_instance)
+      : rpm_ref_{std::cref(rpm_instance)},
+        rank_accessed_{NO_RANK_ACCESSED},
+        rank_info_{initialize_rank_info()} {}
+
+  void pread(std::span<std::byte> buf, int rank, off_t offset) const {
+    pread_noflush(buf, rank, offset);
+    flush();
+  }
+
+  void pread_noflush(std::span<std::byte> buf, int rank, off_t offset) const {
+    const auto& info = rank_info_[rank];
+    if (!info.is_local) {
+      rpm_ref_.get().get(buf, info.win_target_rank,
+                         mpi::aint(info.block_disp + offset));
+      if (rank_accessed_ == NO_RANK_ACCESSED) {
+        rank_accessed_ = info.win_target_rank;
+      } else if (rank_accessed_ != info.win_target_rank) {
+        rank_accessed_ = MULTIPLE_RANKS_ACCESSED;
+      }
+    } else {
+      rpm_ref_.get().file_ops().pread(buf, info.block_disp + offset);
+    }
+  }
+
+  void flush() const {
+    if (rank_accessed_ >= 0) {
+      rpm_ref_.get().flush(rank_accessed_);
+    } else if (rank_accessed_ == MULTIPLE_RANKS_ACCESSED) {
+      rpm_ref_.get().flush_all();
+    }
+    rank_accessed_ = NO_RANK_ACCESSED;
+  }
+
+  std::ostream& inspect(std::ostream& os) const {
+    os << "rpm_blocks" << std::endl;
+    os << "  rank_accessed: " << rank_accessed_ << std::endl;
+    os << "  rank_info: " << std::endl;
+    for (int rank = 0; rank < rpm_ref_.get().topo().size(); ++rank) {
+      const auto& info = rank_info_[rank];
+      os << "    rank: " << rank << std::endl;
+      os << "      is_local: " << info.is_local << std::endl;
+      os << "      win_target_rank: " << info.win_target_rank << std::endl;
+      os << "      block_disp: " << info.block_disp << std::endl;
+    }
+    return os;
+  }
+
+ private:
+  static constexpr int NO_RANK_ACCESSED = -1;
+  static constexpr int MULTIPLE_RANKS_ACCESSED = -2;
+
+  struct rank_info {
+    bool is_local;
+    int win_target_rank;
+    off_t block_disp;
+  };
+
+  auto initialize_rank_info() const -> std::vector<rank_info> {
+    auto rank_info = std::vector<rpm_blocks::rank_info>();
+    auto world_size = rpm_ref_.get().topo().size();
+    rank_info.reserve(world_size);
+    for (int rank = 0; rank < world_size; ++rank) {
+      rank_info[rank] = {
+          rpm_ref_.get().topo().is_local(rank),
+          rpm_ref_.get().win_target_rank(rank),
+          rpm_ref_.get().win_block_disp(rank),
+      };
+    }
+    return rank_info;
+  }
+
+  std::reference_wrapper<const rpm> rpm_ref_;
+  mutable int rank_accessed_;
+  std::vector<rank_info> rank_info_;
 };
 
 }  // namespace rpmbb
