@@ -114,7 +114,7 @@ bool compare_vector_string(const std::vector<std::byte>& v,
 
 auto main(int argc, char* argv[]) -> int try {
   using namespace rpmbb;
-  mpi::env env(&argc, &argv);
+  mpi::runtime runtime(&argc, &argv);
   cxxopts::Options options("io_uring_bench", "io_uring + lipmem2 benchmark");
   // clang-format off
   options.add_options()

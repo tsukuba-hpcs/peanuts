@@ -43,16 +43,16 @@ TEST_CASE("mpi::mpi_error_category") {
   MESSAGE(ec.message());
 }
 
-TEST_CASE("mpi::env") {
-  rpmbb::mpi::env env;
-  rpmbb::mpi::env env2 = std::move(env);
-  rpmbb::mpi::env env3{std::move(env2)};
-  CHECK(rpmbb::mpi::env::is_initialized() == true);
-  CHECK(rpmbb::mpi::env::is_finalize() == false);
-  CHECK(rpmbb::mpi::env::query_thread_support() == MPI_THREAD_MULTIPLE);
-  CHECK(rpmbb::mpi::env::is_thread_main() == true);
-  MESSAGE(rpmbb::mpi::env::processor_name());
-  CHECK(rpmbb::mpi::env::processor_name().size() > 0);
+TEST_CASE("mpi::runtime") {
+  rpmbb::mpi::runtime runtime;
+  rpmbb::mpi::runtime r2 = std::move(runtime);
+  rpmbb::mpi::runtime r3{std::move(r2)};
+  CHECK(rpmbb::mpi::runtime::is_initialized() == true);
+  CHECK(rpmbb::mpi::runtime::is_finalize() == false);
+  CHECK(rpmbb::mpi::runtime::query_thread_support() == MPI_THREAD_MULTIPLE);
+  CHECK(rpmbb::mpi::runtime::is_thread_main() == true);
+  MESSAGE(rpmbb::mpi::runtime::processor_name());
+  CHECK(rpmbb::mpi::runtime::processor_name().size() > 0);
 }
 
 TEST_CASE("comm") {

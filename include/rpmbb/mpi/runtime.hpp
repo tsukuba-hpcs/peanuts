@@ -6,18 +6,18 @@
 #include "rpmbb/mpi/raii.hpp"
 
 namespace rpmbb::mpi {
-class env final {
+class runtime final {
   raii::unique_env env_{};
 
  public:
-  env() : env(nullptr, nullptr) {}
-  explicit env(int* argc, char*** argv) {
+  runtime() : runtime(nullptr, nullptr) {}
+  explicit runtime(int* argc, char*** argv) {
     if (!is_initialized()) {
       MPI_CHECK_ERROR_CODE(MPI_Init(argc, argv));
       env_ = raii::unique_env{true};
     }
   }
-  explicit env(int* argc, char*** argv, int required_thread_support) {
+  explicit runtime(int* argc, char*** argv, int required_thread_support) {
     if (!is_initialized()) {
       int provided;
       MPI_CHECK_ERROR_CODE(

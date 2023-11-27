@@ -144,7 +144,7 @@ auto to_string(std::span<const std::byte> span) -> std::string {
 }
 
 auto main(int argc, char* argv[]) -> int try {
-  mpi::env env(&argc, &argv);
+  mpi::runtime runtime(&argc, &argv);
   cxxopts::Options options("ior_mimic_bench", "IOR-like benchmark");
   // clang-format off
   options.add_options()
