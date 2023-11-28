@@ -39,7 +39,7 @@ struct bb_equal {
 class bb_handler {
  public:
   bb_handler(std::reference_wrapper<rpmbb::rpm> rpm_ref,
-             std::reference_wrapper<ring_buffer> local_ring,
+             std::reference_wrapper<local_ring_buffer> local_ring,
              std::reference_wrapper<const rpm_blocks> rpm_blocks,
              std::shared_ptr<bb> bb,
              zpp::filesystem::weak_file_handle fd =
@@ -109,12 +109,12 @@ class bb_handler {
   }
 
  private:
-  auto ring() const -> ring_buffer& { return local_ring_.get(); }
+  auto ring() const -> local_ring_buffer& { return local_ring_.get(); }
   auto rpm() const -> rpm& { return rpm_ref_.get(); }
 
  private:
   std::reference_wrapper<rpmbb::rpm> rpm_ref_;
-  std::reference_wrapper<ring_buffer> local_ring_;
+  std::reference_wrapper<local_ring_buffer> local_ring_;
   std::reference_wrapper<const rpm_blocks> rpm_blocks_;
   std::shared_ptr<bb> bb_;
   zpp::filesystem::weak_file file_;
@@ -149,7 +149,7 @@ class bb_store {
   void unlink(ino_t ino) { bb_store_.erase(std::make_shared<bb>(bb{ino})); }
   void unlink(int fd) { unlink(utils::get_ino(fd)); }
 
-  auto local_ring() -> ring_buffer& { return local_ring_; }
+  auto local_ring() -> local_ring_buffer& { return local_ring_; }
 
   std::ostream& inspect(std::ostream& os) const {
     os << "rpm_blocks: " << utils::make_inspector(rpm_blocks_) << "\n";
@@ -160,7 +160,7 @@ class bb_store {
   std::unordered_set<std::shared_ptr<bb>, detail::bb_hash, detail::bb_equal>
       bb_store_{};
   std::reference_wrapper<rpm> rpm_ref_;
-  ring_buffer local_ring_;
+  local_ring_buffer local_ring_;
   rpm_blocks rpm_blocks_;
 };
 

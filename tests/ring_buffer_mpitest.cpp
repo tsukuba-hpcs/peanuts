@@ -26,10 +26,10 @@ int main(int argc, char** argv) {
   return test_result;
 }
 
-TEST_CASE("ring_buffer") {
+TEST_CASE("local_ring_buffer") {
   topology topo{};
   rpm rpm_instance{topo, "/tmp/pmem2_devtest", (16ULL << 20)};
-  ring_buffer buffer(rpm_instance, topo.intra_rank());
+  local_ring_buffer buffer(rpm_instance, topo.intra_rank());
 
   SUBCASE("initial state of ring_buffer") {
     CHECK(buffer.head() == 0);
@@ -94,7 +94,7 @@ TEST_CASE("ring_buffer") {
 
   SUBCASE("multiple head and tail movements") {
     size_t chunk_size = buffer.size() / 10;
-    std::optional<ring_buffer::lsn_t> last_reserved_lsn;
+    std::optional<local_ring_buffer::lsn_t> last_reserved_lsn;
     for (int i = 0; i < 5; ++i) {
       last_reserved_lsn = buffer.reserve_nb(chunk_size);
       CHECK(last_reserved_lsn.has_value());
