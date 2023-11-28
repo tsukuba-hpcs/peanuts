@@ -233,7 +233,8 @@ auto main(int argc, char* argv[]) -> int try {
   auto write_elapsed_time = sw.get();
 
   auto target_rank = (topo.rank() + shift_unit) % topo.size();
-  rpmbb::rpm_remote_block remote_block{rpm, target_rank};
+  auto rpm_blocks = rpmbb::rpm_blocks{rpm};
+  auto remote_block = rpmbb::rpm_remote_block{rpm_blocks, target_rank};
   auto xfer_buffer_span = std::span{xfer_buffer};
   auto target_seed = seed ? decltype(seed)(*seed + target_rank) : std::nullopt;
   // fmt::print("myrank: {}, my_seed: {}, target_rank: {}, target_seed: {}\n",
@@ -245,7 +246,7 @@ auto main(int argc, char* argv[]) -> int try {
 
   // warm up
   for (size_t ofs = 0; ofs < block_size; ofs += transfer_size) {
-    remote_block.get(xfer_buffer_span, ofs);
+    remote_block.pread_noflush(xfer_buffer_span, ofs);
   }
   remote_block.flush();
 
