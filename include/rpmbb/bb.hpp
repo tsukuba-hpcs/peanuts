@@ -38,15 +38,15 @@ struct bb_equal {
 
 class bb_handler {
  public:
-  bb_handler(std::reference_wrapper<rpmbb::rpm> rpm_ref,
-             std::reference_wrapper<local_ring_buffer> local_ring,
-             std::reference_wrapper<const rpm_blocks> rpm_blocks,
+  bb_handler(rpmbb::rpm& rpm_ref,
+             local_ring_buffer& local_ring,
+             const std::vector<remote_ring_buffer>& remote_rings,
              std::shared_ptr<bb> bb,
              zpp::filesystem::weak_file_handle fd =
                  zpp::filesystem::weak_file::invalid_file_handle)
-      : rpm_ref_{rpm_ref},
-        local_ring_{local_ring},
-        rpm_blocks_{rpm_blocks},
+      : rpm_ref_{std::ref(rpm_ref)},
+        local_ring_{std::ref(local_ring)},
+        remote_rings_{std::cref(remote_rings)},
         bb_{std::move(bb)},
         file_{fd},
         rank_{rpm().topo().rank()} {}
@@ -98,24 +98,27 @@ class bb_handler {
       auto ofs_in_extent = read_ofs - extent_ofs;
       auto rlsn = it->ptr + ofs_in_extent;
       auto rsize = std::min(buf.size() - bytes_read, it->ex.end - read_ofs);
-      // FIXME: need to consider wrapping around
-      rpm_blocks_.get().pread_noflush(buf.subspan(bytes_read, rsize),
-                                      it->client_id, ring().to_ofs(rlsn));
+      const auto& remote_ring = rring(it->client_id);
+      remote_ring.pread_noflush(buf.subspan(bytes_read, rsize),
+                                remote_ring.to_ofs(rlsn));
       bytes_read += rsize;
       ++it;
     }
-    rpm_blocks_.get().flush();
+    rring(0).flush();
     return bytes_read;
   }
 
  private:
   auto ring() const -> local_ring_buffer& { return local_ring_.get(); }
+  auto rring(int rank) const -> const remote_ring_buffer& {
+    return remote_rings_.get()[rank];
+  }
   auto rpm() const -> rpm& { return rpm_ref_.get(); }
 
  private:
   std::reference_wrapper<rpmbb::rpm> rpm_ref_;
   std::reference_wrapper<local_ring_buffer> local_ring_;
-  std::reference_wrapper<const rpm_blocks> rpm_blocks_;
+  std::reference_wrapper<const std::vector<remote_ring_buffer>> remote_rings_;
   std::shared_ptr<bb> bb_;
   zpp::filesystem::weak_file file_;
   int rank_;
@@ -123,20 +126,21 @@ class bb_handler {
 
 class bb_store {
  public:
-  explicit bb_store(std::reference_wrapper<rpm> rpm_ref)
-      : rpm_ref_(rpm_ref),
+  explicit bb_store(rpm& rpm)
+      : rpm_ref_(std::ref(rpm)),
         local_ring_{rpm_ref_.get()},
-        rpm_blocks_{rpm_ref_.get()} {}
+        rpm_blocks_{rpm_ref_.get()},
+        remote_rings_{create_remote_rings()} {}
 
   std::unique_ptr<bb_handler> open(ino_t ino, int fd) {
     auto bb_obj = std::make_shared<bb>(bb{ino});
     auto [it, inserted] = bb_store_.insert(bb_obj);
     if (fd >= 0) {
-      return std::make_unique<bb_handler>(rpm_ref_, std::ref(local_ring_),
-                                          std::cref(rpm_blocks_), *it, fd);
+      return std::make_unique<bb_handler>(rpm_ref_.get(), local_ring_,
+                                          remote_rings_, *it, fd);
     } else {
-      return std::make_unique<bb_handler>(rpm_ref_, std::ref(local_ring_),
-                                          std::cref(rpm_blocks_), *it);
+      return std::make_unique<bb_handler>(rpm_ref_.get(), local_ring_,
+                                          remote_rings_, *it);
     }
   }
 
@@ -157,11 +161,23 @@ class bb_store {
   }
 
  private:
+  auto create_remote_rings() -> std::vector<remote_ring_buffer> {
+    // remote_rings_.resize(rpm().topo().size());
+    auto remote_rings = std::vector<remote_ring_buffer>{};
+    auto world_size = rpm_ref_.get().topo().size();
+    remote_rings.reserve(world_size);
+    for (int rank = 0; rank < world_size; ++rank) {
+      remote_rings.emplace_back(rpm_remote_block{rpm_blocks_, rank});
+    }
+    return remote_rings;
+  }
+
   std::unordered_set<std::shared_ptr<bb>, detail::bb_hash, detail::bb_equal>
       bb_store_{};
   std::reference_wrapper<rpm> rpm_ref_;
   local_ring_buffer local_ring_;
   rpm_blocks rpm_blocks_;
+  std::vector<remote_ring_buffer> remote_rings_;
 };
 
 }  // namespace rpmbb
