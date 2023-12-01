@@ -18,7 +18,7 @@ struct extent {
   using serialize = zpp::bits::members<2>;
 
   extent() = default;
-  explicit extent(uint64_t begin, uint64_t end) : begin(begin), end(end) {
+  extent(uint64_t begin, uint64_t end) : begin(begin), end(end) {
     assert(begin <= end);
   }
 
@@ -31,16 +31,31 @@ struct extent {
   }
 
   bool overlaps(const extent& other) const {
-    return end > other.begin && begin < other.end;
+    return begin < other.end && other.begin < end;
+  }
+
+  bool contiguous(const extent& other) const {
+    // return begin == other.end || other.begin == end;
+    return other.begin == end;
+  }
+
+  auto get_union(const extent& other) const -> extent {
+    assert(overlaps(other) || contiguous(other));
+    return {std::min(begin, other.begin), std::max(end, other.end)};
+  }
+
+  auto get_intersection(const extent& other) const -> extent {
+    assert(overlaps(other));
+    return {std::max(begin, other.begin), std::min(end, other.end)};
   }
 
   std::optional<extent> get_non_overlapping(const extent& other) const {
     assert(overlaps(other));
 
     if (begin < other.begin) {
-      return extent(begin, other.begin);
+      return extent{begin, other.begin};
     } else if (end > other.end) {
-      return extent(other.end, end);
+      return extent{other.end, end};
     }
     return std::nullopt;
   }
@@ -83,6 +98,11 @@ class extent_tree {
     std::ostream& inspect(std::ostream& os) const {
       return os << "[" << utils::make_inspector(ex) << ":" << ptr << ":"
                 << client_id << "]";
+    }
+
+    bool contiguous(const node& other) const {
+      return ex.contiguous(other.ex) && client_id == other.client_id &&
+             ptr + ex.size() == other.ptr;
     }
   };
 
@@ -228,8 +248,8 @@ class extent_tree {
     // coalesce with previous node
     if (auto prev = it; prev != nodes_.begin()) {
       --prev;
-      if (prev->client_id == it->client_id && prev->ex.end == it->ex.begin &&
-          prev->ptr + prev->ex.size() == it->ptr) {
+
+      if (prev->contiguous(*it)) {
         node coalesced(prev->ex.begin, it->ex.end, prev->ptr, prev->client_id);
         nodes_.erase(prev);
         it = nodes_.erase(it);
@@ -239,8 +259,7 @@ class extent_tree {
 
     // coalesce with next node
     if (auto next = it; ++next != nodes_.end()) {
-      if (next->client_id == it->client_id && next->ex.begin == it->ex.end &&
-          next->ptr == it->ptr + it->ex.size()) {
+      if (it->contiguous(*next)) {
         node coalesced(it->ex.begin, next->ex.end, it->ptr, it->client_id);
         nodes_.erase(it);
         it = nodes_.erase(next);
