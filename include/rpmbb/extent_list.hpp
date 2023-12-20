@@ -14,9 +14,6 @@ class extent_list {
   extent_list() = default;
   extent_list(std::initializer_list<extent> extents) : list_{extents} {}
 
-  auto& get() { return list_; }
-  auto& get() const { return list_; }
-
   auto begin() { return list_.begin(); }
   auto end() { return list_.end(); }
 
@@ -49,7 +46,7 @@ class extent_list {
 
   auto inverse(extent ex) -> extent_list {
     extent_list result;
-    auto& result_list = result.get();
+    auto& result_list = result.list_;
 
     auto it = result_list.before_begin();
     for (auto& list_ex : list_) {
@@ -69,11 +66,32 @@ class extent_list {
     return result;
   }
 
+  auto outer_extent() const -> extent {
+    if (list_.empty()) {
+      return {0, 0};
+    } else {
+      return {list_.front().begin, max()};
+    }
+  }
+
   std::ostream& inspect(std::ostream& os) const {
     for (const auto& ex : list_) {
       os << "[" << utils::make_inspector(ex) << ")";
     }
     return os;
+  }
+
+ private:
+  uint64_t max() const {
+    if (list_.empty()) {
+      return 0;
+    } else {
+      auto it = list_.begin();
+      while (std::next(it) != list_.end()) {
+        ++it;
+      }
+      return it->end;
+    }
   }
 
  private:
