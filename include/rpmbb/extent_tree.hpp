@@ -29,14 +29,16 @@ struct extent {
   bool operator==(const extent& other) const {
     return begin == other.begin && end == other.end;
   }
+  bool operator!=(const extent& other) const { return !(*this == other); }
 
   bool overlaps(const extent& other) const {
     return begin < other.end && other.begin < end;
   }
 
+  bool followed_by(const extent& other) const { return other.begin == end; }
+
   bool contiguous(const extent& other) const {
-    // return begin == other.end || other.begin == end;
-    return other.begin == end;
+    return begin == other.end || other.begin == end;
   }
 
   auto get_union(const extent& other) const -> extent {
@@ -100,8 +102,8 @@ class extent_tree {
                 << client_id << "]";
     }
 
-    bool contiguous(const node& other) const {
-      return ex.contiguous(other.ex) && client_id == other.client_id &&
+    bool followed_by(const node& other) const {
+      return ex.followed_by(other.ex) && client_id == other.client_id &&
              ptr + ex.size() == other.ptr;
     }
   };
@@ -249,7 +251,7 @@ class extent_tree {
     if (auto prev = it; prev != nodes_.begin()) {
       --prev;
 
-      if (prev->contiguous(*it)) {
+      if (prev->followed_by(*it)) {
         node coalesced(prev->ex.begin, it->ex.end, prev->ptr, prev->client_id);
         nodes_.erase(prev);
         it = nodes_.erase(it);
@@ -259,7 +261,7 @@ class extent_tree {
 
     // coalesce with next node
     if (auto next = it; ++next != nodes_.end()) {
-      if (it->contiguous(*next)) {
+      if (it->followed_by(*next)) {
         node coalesced(it->ex.begin, next->ex.end, it->ptr, it->client_id);
         nodes_.erase(it);
         it = nodes_.erase(next);
