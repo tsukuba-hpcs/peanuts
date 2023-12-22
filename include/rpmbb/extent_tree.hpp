@@ -129,6 +129,8 @@ class extent_tree {
   const_iterator end() const { return nodes_.cend(); }
   const_iterator cend() const { return nodes_.cend(); }
 
+  auto back() const -> const node& { return *std::prev(end()); }
+
   void clear() noexcept { nodes_.clear(); }
 
   size_t size() const { return nodes_.size(); }
@@ -144,6 +146,7 @@ class extent_tree {
 
     return it;
   }
+  iterator find(extent ex) { return find(ex.begin, ex.end); }
 
   void merge(const extent_tree& other) {
     static comparator comp;

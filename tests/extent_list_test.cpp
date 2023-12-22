@@ -110,4 +110,15 @@ TEST_SUITE("extent_list") {
           "[0-100)");
     CHECK(utils::to_string(inverse_el.outer_extent()) == "0-100");
   }
+
+  TEST_CASE("intersection(lhs, rhs)") {
+    CHECK(intersection({}, {}).empty());
+    CHECK(intersection({{0, 10}}, {}).empty());
+    CHECK(intersection({{0, 10}}, {{20, 30}}).empty());
+    CHECK(utils::to_string(intersection({{0, 15}}, {{10, 20}})) == "[10-15)");
+
+    extent_list el1{{0, 10}, {15, 25}, {30, 40}};
+    extent_list el2{{5, 20}, {35, 45}};
+    CHECK(utils::to_string(intersection(el1, el2)) == "[5-10)[15-20)[35-40)");
+  }
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rpmbb/extent_list.hpp"
 #include "rpmbb/extent_tree.hpp"
 #include "rpmbb/raii/fd.hpp"
 #include "rpmbb/ring_buffer.hpp"
@@ -67,45 +68,115 @@ class bb_handler {
   }
 
   auto pread(std::span<std::byte> buf, off_t ofs) const -> ssize_t {
-    // TODO: priority = local_tree -> global_tree -> file
-    // now only global_tree -> file
-    auto it = bb_->global_tree.find(ofs, ofs + buf.size());
-    size_t bytes_read = 0;
-    while (bytes_read < buf.size()) {
-      if (it == bb_->global_tree.end()) {
-        break;
-      }
+    auto el = extent_list{};
+    auto user_buf_extent = extent{static_cast<uint64_t>(ofs),
+                                  static_cast<uint64_t>(ofs) + buf.size()};
+    uint64_t eof = 0;
 
-      auto read_ofs = ofs + bytes_read;
-      auto extent_ofs = it->ex.begin;
-      if (read_ofs < extent_ofs) {
-        // need to read from file
-        file_.seek(read_ofs, zpp::filesystem::seek_mode::set);
-        auto gap_size = extent_ofs - read_ofs;
-        auto rsize = file_.read(buf.subspan(bytes_read, gap_size));
-        bytes_read += rsize;
-        if (rsize < gap_size) {
-          // reach the end of file, in this case, this is not an actual EOF.
-          // fill the rest with zeros
-          auto fill_size = std::min(buf.size() - bytes_read, gap_size - rsize);
-          std::memset(buf.data() + bytes_read, 0, fill_size);
-          bytes_read += fill_size;
+    if (bb_->local_tree.size() != 0) {
+      eof = bb_->local_tree.back().ex.end;
+
+      // read from local ring
+      for (auto it = bb_->local_tree.find(user_buf_extent);
+           it != bb_->local_tree.end(); ++it) {
+        if (!it->ex.overlaps(user_buf_extent)) {
+          break;
         }
-        read_ofs += rsize;
+        auto valid_extent = it->ex.get_intersection(user_buf_extent);
+        el.add(valid_extent);
+        ring().pread(buf.subspan(valid_extent.begin - ofs, valid_extent.size()),
+                     it->ptr + (valid_extent.begin - it->ex.begin));
       }
-      assert(read_ofs >= extent_ofs);
-
-      auto ofs_in_extent = read_ofs - extent_ofs;
-      auto rlsn = it->ptr + ofs_in_extent;
-      auto rsize = std::min(buf.size() - bytes_read, it->ex.end - read_ofs);
-      const auto& remote_ring = rring(it->client_id);
-      remote_ring.pread_noflush(buf.subspan(bytes_read, rsize),
-                                remote_ring.to_ofs(rlsn));
-      bytes_read += rsize;
-      ++it;
     }
+
+    auto hole_el = el.inverse(user_buf_extent);
+    if (hole_el.empty()) {
+      return buf.size();
+    }
+
+    // read remaining from remote rings
+    if (bb_->global_tree.size() != 0) {
+      eof = std::max(eof, bb_->global_tree.back().ex.end);
+
+      auto hole_it = hole_el.begin();
+      auto global_it = bb_->global_tree.find(hole_el.outer_extent());
+      while (hole_it != hole_el.end() && global_it != bb_->global_tree.end()) {
+        auto& hole_ex = *hole_it;
+        auto& global_ex = global_it->ex;
+
+        if (hole_ex.end <= global_ex.begin) {
+          ++hole_it;
+        } else if (global_ex.end <= hole_ex.begin) {
+          ++global_it;
+        } else {
+          // has overlap
+          auto valid_ex = hole_ex.get_intersection(global_ex);
+          el.add(valid_ex);
+
+          // read from remote rings
+          rring(global_it->client_id)
+              .pread_noflush(
+                  buf.subspan(valid_ex.begin - ofs, valid_ex.size()),
+                  global_it->ptr + (valid_ex.begin - global_ex.begin));
+          
+          if (hole_ex.end < global_ex.end) {
+            ++hole_it;
+          } else if (global_ex.end < hole_ex.end) {
+            ++global_it;
+          } else {
+            ++hole_it;
+            ++global_it;
+          }
+        }
+      }
+
+      hole_el = el.inverse(user_buf_extent);
+      if (hole_el.empty()) {
+        rring(0).flush();
+        return buf.size();
+      }
+    }
+
+    // read remaining from file
+    for (auto it = hole_el.begin(); it != hole_el.end(); ++it) {
+      const auto& hole_ex = *it;
+      file_.seek(hole_ex.begin, zpp::filesystem::seek_mode::set);
+      auto rsize = file_.read(buf.subspan(hole_ex.begin - ofs, hole_ex.size()));
+      auto remain = hole_ex.size() - rsize;
+      if (remain > 0) {
+        // reach the end of file,
+        if (hole_ex.begin + rsize >= eof) {
+          break;
+        }
+
+        // in this case, this is not an actual EOF.
+        // fill the rest with zeros
+        // until reach the EOF from the extent_tree view.
+
+        auto fill_size = std::min(remain, eof - (hole_ex.begin + rsize));
+        std::memset(buf.data() + (hole_ex.begin - ofs + rsize), 0, fill_size);
+
+        // remaining holes should be filled with zeros
+        for (; it != hole_el.end(); ++it) {
+          const auto& hole_ex = *it;
+          if (hole_ex.begin >= eof) {
+            // reach true EOF
+            break;
+          }
+          fill_size = std::min(hole_ex.size(), eof - hole_ex.begin);
+          std::memset(buf.data() + (hole_ex.begin - ofs), 0, fill_size);
+        }
+      }
+    }
+
+    // make sure read from all remote rings are completed
     rring(0).flush();
-    return bytes_read;
+
+    if (ofs + buf.size() >= eof) {
+      return eof - ofs;
+    } else {
+      return buf.size();
+    }
   }
 
  private:
@@ -162,7 +233,6 @@ class bb_store {
 
  private:
   auto create_remote_rings() -> std::vector<remote_ring_buffer> {
-    // remote_rings_.resize(rpm().topo().size());
     auto remote_rings = std::vector<remote_ring_buffer>{};
     auto world_size = rpm_ref_.get().topo().size();
     remote_rings.reserve(world_size);

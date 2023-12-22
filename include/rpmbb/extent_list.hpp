@@ -96,6 +96,43 @@ class extent_list {
 
  private:
   list_t list_{};
+
+  friend inline auto intersection(const extent_list& lhs,
+                                  const extent_list& rhs) -> extent_list;
 };
+
+inline auto intersection(const extent_list& lhs, const extent_list& rhs)
+    -> extent_list {
+  extent_list result;
+  auto& result_list = result.list_;
+
+  auto res_it = result_list.before_begin();
+  auto lhs_it = lhs.list_.begin();
+  auto rhs_it = rhs.list_.begin();
+
+  while (lhs_it != lhs.list_.end() && rhs_it != rhs.list_.end()) {
+    auto& lhs_ex = *lhs_it;
+    auto& rhs_ex = *rhs_it;
+
+    if (lhs_ex.end <= rhs_ex.begin) {
+      ++lhs_it;
+    } else if (rhs_ex.end <= lhs_ex.begin) {
+      ++rhs_it;
+    } else {
+      res_it =
+          result_list.insert_after(res_it, lhs_ex.get_intersection(rhs_ex));
+      if (lhs_ex.end < rhs_ex.end) {
+        ++lhs_it;
+      } else if (rhs_ex.end < lhs_ex.end) {
+        ++rhs_it;
+      } else {
+        ++lhs_it;
+        ++rhs_it;
+      }
+    }
+  }
+
+  return result;
+}
 
 }  // namespace rpmbb
