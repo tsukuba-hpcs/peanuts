@@ -77,10 +77,10 @@ class bb_handler {
     topo.comm().all_gather_v(std::as_bytes(std::span{ser_local_tree}),
                              std::as_writable_bytes(std::span{ser_local_trees}),
                              std::span{sizes});
-    
+
     // deserialize remote local trees and merge into global tree
     auto tmp_tree = extent_tree{};
-    for(size_t i = 0; i < sizes.size(); ++i) {
+    for (size_t i = 0; i < sizes.size(); ++i) {
       in(tmp_tree).or_throw();
       bb_->global_tree.merge(tmp_tree);
     }
@@ -226,10 +226,17 @@ class bb_handler {
 };
 
 class bb_store {
+  struct block_metadata {
+    ring_tracker tracker;
+    local_ring_buffer::lsn_t snapshot_lsn;
+  };
+  static_assert(std::is_trivially_copyable_v<block_metadata>);
+
  public:
   explicit bb_store(rpm& rpm)
       : rpm_ref_(std::ref(rpm)),
-        local_ring_{rpm_ref_.get()},
+        local_block_{rpm_ref_.get(), rpm.topo().intra_rank()},
+        local_ring_{create_local_ring()},
         rpm_blocks_{rpm_ref_.get()},
         remote_rings_{create_remote_rings()} {}
 
@@ -262,19 +269,46 @@ class bb_store {
   }
 
  private:
+  auto ring_size() const -> size_t {
+    return rpm_ref_.get().block_size() - sizeof(block_metadata);
+  }
+
+  auto create_local_ring() -> local_ring_buffer {
+    auto& rpm = rpm_ref_.get();
+    if (rpm.block_size() < sizeof(block_metadata)) {
+      throw std::runtime_error("pmem size is too small");
+    }
+    return local_ring_buffer{local_block_, ring_size()};
+  }
+
   auto create_remote_rings() -> std::vector<remote_ring_buffer> {
+    auto& rpm = rpm_ref_.get();
     auto remote_rings = std::vector<remote_ring_buffer>{};
-    auto world_size = rpm_ref_.get().topo().size();
+    auto world_size = rpm.topo().size();
     remote_rings.reserve(world_size);
     for (int rank = 0; rank < world_size; ++rank) {
-      remote_rings.emplace_back(rpm_remote_block{rpm_blocks_, rank});
+      remote_rings.emplace_back(rpm_remote_block{rpm_blocks_, rank},
+                                ring_size());
     }
     return remote_rings;
+  }
+
+  auto save_block_metadata_to_local_block(const block_metadata& meta) -> void {
+    local_block_.pwrite_nt(
+        std::span<const std::byte>{reinterpret_cast<const std::byte*>(&meta),
+                                   sizeof(block_metadata)},
+        static_cast<off_t>(ring_size()));
+  }
+
+  auto local_block_metadata() const -> const block_metadata& {
+    return *reinterpret_cast<const block_metadata*>(
+        static_cast<std::byte*>(local_block_.data()) + ring_size());
   }
 
   std::unordered_set<std::shared_ptr<bb>, detail::bb_hash, detail::bb_equal>
       bb_store_{};
   std::reference_wrapper<rpm> rpm_ref_;
+  rpm_local_block local_block_;
   local_ring_buffer local_ring_;
   rpm_blocks rpm_blocks_;
   std::vector<remote_ring_buffer> remote_rings_;
