@@ -80,13 +80,19 @@ class rpm {
  private:
   pmem2::device create_pmem2_device(std::string_view pmem_path,
                                     size_t pmem_size) {
-    auto device = pmem2::device{pmem_path};
-    if (!device.is_devdax() && pmem_size > 0) {
-      if (topo_.get().intra_rank() == 0) {
-        device.truncate(pmem_size);
+    if (topo().intra_rank() == 0) {
+      auto device = pmem2::device{pmem_path};
+      if (!device.is_devdax() && pmem_size > 0) {
+        if (topo_.get().intra_rank() == 0) {
+          device.truncate(pmem_size);
+        }
       }
+      topo().intra_comm().barrier();
+      return device;
+    } else {
+      topo().intra_comm().barrier();
+      return pmem2::device{pmem_path};
     }
-    return device;
   }
 
   mpi::win create_win() {
