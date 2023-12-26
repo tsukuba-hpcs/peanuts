@@ -84,6 +84,9 @@ class bb_handler {
       in(tmp_tree).or_throw();
       bb_->global_tree.merge(tmp_tree);
     }
+
+    // clear merged local tree
+    bb_->local_tree.clear();
   }
 
   auto pwrite(std::span<const std::byte> buf, off_t ofs) const -> ssize_t {
