@@ -277,47 +277,50 @@ auto main(int argc, char* argv[]) -> int try {
   sw.reset();
   topo.comm().barrier();
 
-  // serialize local extent tree
-  auto [send_data, out] = zpp::bits::data_out();
-  out(handler->bb_ref().local_tree).or_throw();
+  // sync local trees and merge into global tree
+  handler->sync();
+
+  // // serialize local extent tree
+  // auto [send_data, out] = zpp::bits::data_out();
+  // out(handler->bb_ref().local_tree).or_throw();
+
+  // topo.comm().barrier();
+  // time_json["time_serialize"] = sw.lap_time().count();
+  // topo.comm().barrier();
+
+  // // allgather serialized extent tree size
+  // std::vector<int> extent_tree_sizes(topo.size());
+  // topo.comm().all_gather(static_cast<int>(send_data.size()),
+  //                        std::span{extent_tree_sizes});
+
+  // // all_gather_v serialized extent tree
+  // auto [recv_data, in] = zpp::bits::data_in();
+  // recv_data.resize(std::accumulate(extent_tree_sizes.begin(),
+  //                                  extent_tree_sizes.end(), 0ULL));
+  // topo.comm().all_gather_v(std::as_bytes(std::span{send_data}),
+  //                          std::as_writable_bytes(std::span{recv_data}),
+  //                          std::span{extent_tree_sizes});
+
+  // topo.comm().barrier();
+  // time_json["time_allgather"] = sw.lap_time().count();
+  // topo.comm().barrier();
+
+  // // deserialize extent trees
+  // in(handler->bb_ref().global_tree).or_throw();
+
+  // topo.comm().barrier();
+  // time_json["time_deserialize"] = sw.lap_time().count();
+  // topo.comm().barrier();
+
+  // // FIXME: inefficient merge
+  // extent_tree tmp_tree;
+  // for (size_t i = 1; i < extent_tree_sizes.size(); ++i) {
+  //   in(tmp_tree).or_throw();
+  //   handler->bb_ref().global_tree.merge(tmp_tree);
+  // }
 
   topo.comm().barrier();
-  time_json["time_serialize"] = sw.lap_time().count();
-  topo.comm().barrier();
-
-  // allgather serialized extent tree size
-  std::vector<int> extent_tree_sizes(topo.size());
-  topo.comm().all_gather(static_cast<int>(send_data.size()),
-                         std::span{extent_tree_sizes});
-
-  // all_gather_v serialized extent tree
-  auto [recv_data, in] = zpp::bits::data_in();
-  recv_data.resize(std::accumulate(extent_tree_sizes.begin(),
-                                   extent_tree_sizes.end(), 0ULL));
-  topo.comm().all_gather_v(std::as_bytes(std::span{send_data}),
-                           std::as_writable_bytes(std::span{recv_data}),
-                           std::span{extent_tree_sizes});
-
-  topo.comm().barrier();
-  time_json["time_allgather"] = sw.lap_time().count();
-  topo.comm().barrier();
-
-  // deserialize extent trees
-  in(handler->bb_ref().global_tree).or_throw();
-
-  topo.comm().barrier();
-  time_json["time_deserialize"] = sw.lap_time().count();
-  topo.comm().barrier();
-
-  // FIXME: inefficient merge
-  extent_tree tmp_tree;
-  for (size_t i = 1; i < extent_tree_sizes.size(); ++i) {
-    in(tmp_tree).or_throw();
-    handler->bb_ref().global_tree.merge(tmp_tree);
-  }
-
-  topo.comm().barrier();
-  time_json["time_merge"] = sw.lap_time().count();
+  // time_json["time_merge"] = sw.lap_time().count();
   time_json["time_sync"] = sw.get().count();
   memory_json["memory_sync"] = memory_usage::get_current_rss_kb();
   tree_size_json["tree_size_global"] = handler->bb_ref().global_tree.size();

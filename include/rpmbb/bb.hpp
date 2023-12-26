@@ -8,10 +8,12 @@
 #include "rpmbb/utils/fs.hpp"
 
 #include <zpp/file.h>
+#include <zpp_bits.h>
 
 #include <sys/types.h>
 #include <functional>
 #include <memory>
+#include <span>
 #include <unordered_map>
 
 namespace rpmbb {
@@ -55,6 +57,32 @@ class bb_handler {
   auto bb_ref() -> rpmbb::bb& { return *bb_; }
 
   auto has_valid_file() const -> bool { return static_cast<bool>(file_); }
+
+  auto sync() {
+    // serialize local extent tree
+    auto [ser_local_tree, out] = zpp::bits::data_out();
+    out(bb_->local_tree).or_throw();
+
+    // all_gather serialized local tree size
+    const auto& topo = rpm().topo();
+    auto sizes = std::vector<int>(topo.size());
+    topo.comm().all_gather(static_cast<int>(ser_local_tree.size()),
+                           std::span{sizes});
+
+    // all_gather_v serialized local tree
+    auto [ser_local_trees, in] = zpp::bits::data_in();
+    ser_local_trees.resize(std::accumulate(sizes.begin(), sizes.end(), 0ULL));
+    topo.comm().all_gather_v(std::as_bytes(std::span{ser_local_tree}),
+                             std::as_writable_bytes(std::span{ser_local_trees}),
+                             std::span{sizes});
+    
+    // deserialize remote local trees and merge into global tree
+    auto tmp_tree = extent_tree{};
+    for(size_t i = 0; i < sizes.size(); ++i) {
+      in(tmp_tree).or_throw();
+      bb_->global_tree.merge(tmp_tree);
+    }
+  }
 
   auto pwrite(std::span<const std::byte> buf, off_t ofs) const -> ssize_t {
     auto lsn = ring().reserve_nb(buf.size());
@@ -118,7 +146,7 @@ class bb_handler {
               .pread_noflush(
                   buf.subspan(valid_ex.begin - ofs, valid_ex.size()),
                   global_it->ptr + (valid_ex.begin - global_ex.begin));
-          
+
           if (hole_ex.end < global_ex.end) {
             ++hole_it;
           } else if (global_ex.end < hole_ex.end) {
