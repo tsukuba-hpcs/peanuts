@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
 TEST_CASE("bb_store") {
   topology topo{};
   rpm rpm{std::cref(topo), "/tmp/pmem2_devtest",
-          (1ULL << 21) * topo.intra_size()};
+          (2ULL << 20) * topo.intra_size()};
   auto store = bb_store{rpm};
 
   const auto files = std::vector<std::string>{"/tmp/bb_store_test_file1",
