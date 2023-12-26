@@ -114,6 +114,10 @@ class extent_tree {
     }
   };
 
+  auto operator==(const extent_tree& other) const -> bool {
+    return nodes_ == other.nodes_;
+  }
+
   std::set<node, comparator> nodes_;
 
   using serialize = zpp::bits::members<1>;

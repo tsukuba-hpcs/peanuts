@@ -1,5 +1,7 @@
 #pragma once
 
+#include <zpp_bits.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <utility>
@@ -54,6 +56,8 @@ class ring_tracker {
   size_t ring_size() const { return ring_size_; }
   lsn_t head() const { return head_lsn_; }
   lsn_t tail() const { return tail_lsn_; }
+
+  using serialize = zpp::bits::members<3>;
 
  private:
   size_t ring_size_;

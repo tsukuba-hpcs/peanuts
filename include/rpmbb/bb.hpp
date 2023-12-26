@@ -22,6 +22,8 @@ struct bb {
   ino_t ino;
   extent_tree global_tree{};
   extent_tree local_tree{};
+
+  using serialize = zpp::bits::members<3>;
 };
 
 namespace detail {

@@ -3,8 +3,8 @@
 
 #include "rpmbb/bb.hpp"
 #include "rpmbb/raii/fd.hpp"
-#include "rpmbb/rpm.hpp"
 #include "rpmbb/ring_buffer.hpp"
+#include "rpmbb/rpm.hpp"
 #include "rpmbb/topology.hpp"
 #include "rpmbb/utils/fs.hpp"
 using namespace rpmbb;
@@ -20,7 +20,6 @@ using namespace rpmbb;
 #include <unistd.h>
 
 int main(int argc, char** argv) {
-  // MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, nullptr);
   doctest::mpi_init_thread(argc, argv, MPI_THREAD_MULTIPLE);
 
   doctest::Context ctx;
@@ -32,7 +31,6 @@ int main(int argc, char** argv) {
 
   int test_result = ctx.run();
 
-  // MPI_Finalize();
   doctest::mpi_finalize();
 
   return test_result;
@@ -68,4 +66,29 @@ TEST_CASE("bb_store") {
   auto handler3 = store.open(ino1, fd3.get());
 
   CHECK(handler3 != nullptr);
+}
+
+TEST_CASE("Testing serialization and deserialization of bb") {
+  topology topo{};
+  // Create the original bb object
+  rpmbb::bb original_bb;
+  original_bb.ino = 12345;
+  for (int rank = 0; rank < topo.size(); ++rank) {
+    original_bb.global_tree.add(rank * 100, 100 + rank * 100, 0, rank);
+  }
+  original_bb.local_tree.add(topo.size() * 100, topo.size() * 100 + 100, 100,
+                             topo.rank());
+
+  auto [serialized_data, in, out] = zpp::bits::data_in_out();
+  // Serialize
+  out(original_bb).or_throw();
+
+  // Deserialize
+  rpmbb::bb deserialized_bb;
+  in(deserialized_bb).or_throw();
+
+  // Compare original and deserialized objects
+  CHECK(deserialized_bb.ino == original_bb.ino);
+  CHECK(deserialized_bb.global_tree == original_bb.global_tree);
+  CHECK(deserialized_bb.local_tree == original_bb.local_tree);
 }
