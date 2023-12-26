@@ -123,13 +123,13 @@ class ring_buffer<rpm_local_block>
   }
 
   auto pwrite(std::span<const std::byte> buf, lsn_t lsn) const -> void {
-    auto ofs = this->tracker_.to_ofs(lsn);
-    auto size = this->tracker_.first_segment_size_ofs(ofs, buf.size());
+    auto ofs = tracker_.to_ofs(lsn);
+    auto size = tracker_.first_segment_size_ofs(ofs, buf.size());
     if (size == buf.size()) {
-      this->block_.pwrite(buf, ofs);
+      block_.pwrite(buf, ofs);
     } else {
-      this->block_.pwrite(buf.subspan(0, size), ofs);
-      this->block_.pwrite(buf.subspan(size), 0);
+      block_.pwrite(buf.subspan(0, size), ofs);
+      block_.pwrite(buf.subspan(size), 0);
     }
   }
 };
