@@ -33,6 +33,8 @@ class read_only_ring_buffer {
   size_t size() const { return tracker_.ring_size(); }
   lsn_t head() const { return tracker_.head(); }
   lsn_t tail() const { return tracker_.tail(); }
+  auto tracker() const -> const ring_tracker& { return tracker_; }
+  auto set_tracker(const ring_tracker& tracker) -> void { tracker_ = tracker; }
   uint64_t to_ofs(lsn_t lsn) const { return tracker_.to_ofs(lsn); }
 
   auto pread(std::span<std::byte> buf, lsn_t lsn) const -> void {

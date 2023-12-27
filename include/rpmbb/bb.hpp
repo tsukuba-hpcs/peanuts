@@ -232,6 +232,7 @@ class bb_store {
   struct block_metadata {
     ring_tracker tracker;
     local_ring_buffer::lsn_t snapshot_lsn;
+    size_t snapshot_size;
   };
   static_assert(std::is_trivially_copyable_v<block_metadata>);
 
@@ -242,6 +243,53 @@ class bb_store {
         local_ring_{create_local_ring()},
         rpm_blocks_{rpm_ref_.get()},
         remote_rings_{create_remote_rings()} {}
+
+  auto save() -> void {
+    // save bb indices
+    auto snapshot_lsn = local_ring_.head();
+    auto [ser_bb, out] = zpp::bits::data_out();
+    for (const auto& bb_ptr : bb_store_) {
+      ser_bb.resize(sizeof(size_t));
+      out.position() += sizeof(size_t);
+      out(*bb_ptr).or_throw();
+      *reinterpret_cast<size_t*>(ser_bb.data()) =
+          ser_bb.size() - sizeof(size_t);
+      auto lsn = local_ring_.reserve_nb(ser_bb.size());
+      if (!lsn) {
+        throw std::runtime_error("bb_store::save(): local ring is full");
+      }
+      local_ring_.pwrite(ser_bb, *lsn);
+      ser_bb.clear();
+      out.reset();
+    }
+    save_block_metadata_to_local_block(
+        block_metadata{local_ring_.tracker(), snapshot_lsn,
+                       local_ring_.head() - snapshot_lsn});
+  }
+
+  auto load() -> void {
+    local_ring_.set_tracker(local_block_metadata().tracker);
+    auto snapshot_lsn = local_block_metadata().snapshot_lsn;
+
+    // load bb indices
+    auto cur_lsn = snapshot_lsn;
+    while (cur_lsn < local_ring_.head()) {
+      size_t serialized_size;
+      // Read the size
+      local_ring_.pread(std::as_writable_bytes(std::span{&serialized_size, 1}),
+                        cur_lsn);
+      cur_lsn += sizeof(size_t);
+
+      auto temp_buffer = std::vector<std::byte>(serialized_size);
+      local_ring_.pread(temp_buffer, cur_lsn);
+      cur_lsn += serialized_size;
+
+      auto in = zpp::bits::in{temp_buffer};
+      auto bb_ptr = std::make_shared<bb>();
+      in(*bb_ptr).or_throw();
+      bb_store_.insert(bb_ptr);
+    }
+  }
 
   std::unique_ptr<bb_handler> open(ino_t ino, int fd) {
     auto bb_obj = std::make_shared<bb>(bb{ino});

@@ -14,6 +14,8 @@ class ring_tracker {
 
   explicit ring_tracker(size_t ring_size)
       : ring_size_(ring_size), head_lsn_(0), tail_lsn_(0) {}
+  ring_tracker(size_t ring_size, lsn_t head_lsn, lsn_t tail_lsn)
+      : ring_size_(ring_size), head_lsn_(head_lsn), tail_lsn_(tail_lsn) {}
 
   uint64_t allocate(size_t size) {
     return std::exchange(head_lsn_, head_lsn_ + size);
