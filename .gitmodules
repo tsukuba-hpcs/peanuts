@@ -1,0 +1,4 @@
+[submodule "spack/repos/tsukuba-hpcs"]
+	path = spack/repos/tsukuba-hpcs
+	url = https://github.com/tsukuba-hpcs/spack-packages.git
+	update = merge
