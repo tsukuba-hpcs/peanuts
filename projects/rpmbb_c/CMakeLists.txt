@@ -48,7 +48,9 @@ endif()
 # ---- Add dependencies via CPM ----
 include(cmake/CPM.cmake)
 
-CPMAddPackage(NAME rpmbb SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../rpmbb)
+if (NOT TARGET rpmbb::rpmbb)
+  CPMAddPackage(NAME rpmbb SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../rpmbb)
+endif()
 
 # ---- Create library ----
 file(

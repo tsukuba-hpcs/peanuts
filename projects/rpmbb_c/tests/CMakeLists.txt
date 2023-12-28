@@ -1,18 +1,20 @@
-find_package(doctest REQUIRED)
+enable_testing()
+
+# find_package(doctest REQUIRED)
 find_package(Threads REQUIRED)
+find_package(MPI REQUIRED CXX)
 
 macro(build_test testname testfilepath)
   add_executable(${testname} ${CMAKE_CURRENT_LIST_DIR}/${testfilepath})
   target_link_libraries(
     ${testname}
-    PRIVATE Threads::Threads
-            cxxopts::cxxopts
-            fmt::fmt
-            nlohmann_json::nlohmann_json
+    PRIVATE rpmbb::${PROJECT_NAME}
+            MPI::MPI_CXX
+            Threads::Threads
             doctest::doctest
-            ${PROJECT_NAME}::${PROJECT_NAME}
   )
   target_include_directories(${testname} PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>)
+  target_compile_features(${testname} PUBLIC cxx_std_20)
   set_target_properties(
     ${testname}
     PROPERTIES CXX_STANDARD 20
