@@ -18,7 +18,7 @@ class rpm {
   static constexpr size_t pmem_alignment = 1ULL << 21;
 
   explicit rpm(std::reference_wrapper<const topology> topo_ref,
-               std::string_view pmem_path,
+               const std::string& pmem_path,
                size_t pmem_size = 0)
       : topo_(std::move(topo_ref)),
         device_{create_pmem2_device(pmem_path, pmem_size)},
@@ -78,8 +78,7 @@ class rpm {
   auto flush_all() const { win_.flush_all(); }
 
  private:
-  pmem2::device create_pmem2_device(std::string_view pmem_path,
-                                    size_t pmem_size) {
+  pmem2::device create_pmem2_device(const std::string& pmem_path, size_t pmem_size) {
     if (topo().intra_rank() == 0) {
       auto device = pmem2::device{pmem_path};
       if (!device.is_devdax() && pmem_size > 0) {

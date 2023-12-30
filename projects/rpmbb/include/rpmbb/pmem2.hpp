@@ -11,7 +11,6 @@
 #include <memory>
 #include <optional>
 #include <span>
-#include <string_view>
 #include <system_error>
 #include <vector>
 
@@ -66,11 +65,11 @@ class device {
 
  public:
   device() = default;
-  explicit device(std::string_view path, bool create_if_does_not_exist = true) {
-    fd_ = raii::file_descriptor(::open(path.data(), O_RDWR));
+  explicit device(const std::string& path, bool create_if_does_not_exist = true) {
+    fd_ = raii::file_descriptor(::open(path.c_str(), O_RDWR));
     if (!fd_ && create_if_does_not_exist) {
       fd_ = raii::file_descriptor(
-          ::open(path.data(), O_RDWR | O_CREAT | O_EXCL | O_TRUNC, 0600));
+          ::open(path.c_str(), O_RDWR | O_CREAT | O_EXCL | O_TRUNC, 0600));
       if (!fd_) {
         throw pmem2_error(errno, "pmem2::device::open failed");
       }
