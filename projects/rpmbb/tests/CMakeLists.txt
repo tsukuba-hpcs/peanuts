@@ -19,6 +19,7 @@ macro(build_test testname testfilepath)
                CXX_STANDARD_REQUIRED ON
                CXX_EXTENSIONS OFF
   )
+  target_compile_definitions(${testname} PRIVATE -DOMPI_SKIP_MPICXX -DMPICH_SKIP_MPICXX)
 endmacro()
 
 file(

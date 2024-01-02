@@ -2,14 +2,14 @@ enable_testing()
 
 # find_package(doctest REQUIRED)
 find_package(Threads REQUIRED)
-find_package(MPI REQUIRED CXX)
+find_package(MPI REQUIRED C)
 
 macro(build_test testname testfilepath)
   add_executable(${testname} ${CMAKE_CURRENT_LIST_DIR}/${testfilepath})
   target_link_libraries(
     ${testname}
     PRIVATE rpmbb::${PROJECT_NAME}
-            MPI::MPI_CXX
+            MPI::MPI_C
             Threads::Threads
             doctest::doctest
   )
@@ -21,6 +21,7 @@ macro(build_test testname testfilepath)
                CXX_STANDARD_REQUIRED ON
                CXX_EXTENSIONS OFF
   )
+  target_compile_definitions(${testname} PRIVATE -DOMPI_SKIP_MPICXX -DMPICH_SKIP_MPICXX)
 endmacro()
 
 file(

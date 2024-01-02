@@ -48,7 +48,7 @@ endif()
 # ---- Add dependencies via CPM ----
 include(cmake/CPM.cmake)
 
-if (NOT TARGET rpmbb::rpmbb)
+if(NOT TARGET rpmbb::rpmbb)
   CPMAddPackage(NAME rpmbb SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../rpmbb)
 endif()
 
@@ -84,12 +84,13 @@ target_compile_options(
           -Wextra
           -pedantic
 )
+target_compile_definitions(${PROJECT_NAME} PRIVATE -DOMPI_SKIP_MPICXX -DMPICH_SKIP_MPICXX)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE rpmbb::rpmbb)
 
 target_include_directories(
-  ${PROJECT_NAME} INTERFACE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
-                            "$<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>"
+  ${PROJECT_NAME} PUBLIC "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
+                         "$<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>"
 )
 
 include(cmake/version.cmake)
