@@ -183,5 +183,5 @@ spack:
       - spec: zip@3.0
         prefix: /usr
   repos:
-  - /workspaces/rpmembb/spack/repos/rpmembb
+  - /workspaces/rpmembb/spack/repos/rpmbb
   - /workspaces/rpmembb/spack/repos/tsukuba-hpcs
