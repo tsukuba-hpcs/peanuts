@@ -6,8 +6,8 @@
 from spack.package import *
 
 
-class Rpmembb(CMakePackage):
-    """rpmembb: aggregate node-local persistent memory by MPI RMA"""
+class Rpmbb(CMakePackage):
+    """rpmbb: aggregate node-local persistent memory by MPI RMA"""
 
     homepage = "https://github.com/tsukuba-hpcs/rpmembb"
     # url = ""
@@ -17,6 +17,7 @@ class Rpmembb(CMakePackage):
     maintainers("range3")
 
     version("master", branch="master")
+    version("0.2.0", tag="v0.2.0")
     version("0.1.0", tag="v0.1.0", submodules=True)
 
     depends_on("mpi")
