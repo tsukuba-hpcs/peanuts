@@ -21,6 +21,7 @@ class Rpmbb(CMakePackage):
     version("0.1.0", tag="v0.1.0", submodules=True)
 
     depends_on("mpi")
+    depends_on("pmdk+ndctl")
 
     conflicts("%gcc@:9")
 
