@@ -17,6 +17,7 @@ class Rpmbb(CMakePackage):
     maintainers("range3")
 
     version("master", branch="master")
+    version("0.3.0", tag="v0.3.0")
     version("0.2.0", tag="v0.2.0")
     version("0.1.0", tag="v0.1.0", submodules=True)
 
