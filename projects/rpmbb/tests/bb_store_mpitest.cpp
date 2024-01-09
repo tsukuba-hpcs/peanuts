@@ -10,6 +10,7 @@
 using namespace rpmbb;
 
 #include <fmt/format.h>
+#include <zpp/file.h>
 
 #include <mpi.h>
 
@@ -36,6 +37,41 @@ int main(int argc, char** argv) {
   doctest::mpi_finalize();
 
   return test_result;
+}
+
+TEST_CASE("bb_store save/load") {
+  const char* pmem_path = "/tmp/pmem2_devtest_save_load";
+  const char* file_path = "/tmp/bb_testfile";
+  {
+    topology topo{};
+    rpm rpm{std::cref(topo), pmem_path, (2ULL << 20) * topo.intra_size()};
+    auto store = bb_store{rpm};
+    auto file = zpp::filesystem::file(zpp::filesystem::file_handle{
+        ::open(file_path, O_RDWR | O_CREAT, 0644)});
+    auto handler = store.open(file.get());
+    MESSAGE("ino: ", utils::get_ino(file.get()));
+    handler->pwrite(std::as_bytes(std::span{"hello world.", 12}), 0);
+    handler->pwrite(std::as_bytes(std::span{"hoge", 4}), 256);
+    handler.reset();
+    store.save();
+  }
+
+  {
+    topology topo{};
+    rpm rpm{std::cref(topo), pmem_path, (2ULL << 20) * topo.intra_size()};
+    auto store = bb_store{rpm};
+    store.load();
+    auto file = zpp::filesystem::file(zpp::filesystem::file_handle{
+        ::open(file_path, O_RDWR | O_CREAT, 0644)});
+    auto handler = store.open(file.get());
+    std::string buf(12, '\0'); 
+    handler->pread(std::as_writable_bytes(std::span{buf}), 0);
+    CHECK(std::string_view{"hello world."} == buf);
+    handler->pread(std::as_writable_bytes(std::span{buf}.subspan(0, 4)), 256);
+    CHECK(std::string_view{"hoge"} == buf.substr(0, 4));
+    handler.reset();
+    store.save();
+  }
 }
 
 TEST_CASE("bb_store") {

@@ -43,7 +43,7 @@ int rpmbb_store_save(rpmbb_store_t store) try {
 
 int rpmbb_store_load(rpmbb_store_t store) try {
   auto cpp_store = reinterpret_cast<rpmbb::bb_store*>(store->store);
-  cpp_store->save();
+  cpp_store->load();
   return 0;
 } catch (...) {
   return -1;
