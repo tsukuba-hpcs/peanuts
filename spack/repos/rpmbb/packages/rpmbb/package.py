@@ -17,7 +17,7 @@ class Rpmbb(CMakePackage):
     maintainers("range3")
 
     version("master", branch="master")
-    version("0.3.1", tag="v0.3.1")
+    version("0.4.0", tag="v0.4.0")
 
     depends_on("mpi")
     depends_on("pmdk+ndctl")
