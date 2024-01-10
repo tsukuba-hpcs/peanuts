@@ -49,7 +49,7 @@ TEST_CASE("bb_store save/load") {
     auto file = zpp::filesystem::file(zpp::filesystem::file_handle{
         ::open(file_path, O_RDWR | O_CREAT, 0644)});
     auto handler = store.open(file.get());
-    MESSAGE("ino: ", utils::get_ino(file.get()));
+    // MESSAGE("ino: ", utils::get_ino(file.get()));
     handler->pwrite(std::as_bytes(std::span{"hello world.", 12}), 0);
     handler->pwrite(std::as_bytes(std::span{"hoge", 4}), 256);
     handler.reset();
@@ -64,7 +64,7 @@ TEST_CASE("bb_store save/load") {
     auto file = zpp::filesystem::file(zpp::filesystem::file_handle{
         ::open(file_path, O_RDWR | O_CREAT, 0644)});
     auto handler = store.open(file.get());
-    std::string buf(12, '\0'); 
+    std::string buf(12, '\0');
     handler->pread(std::as_writable_bytes(std::span{buf}), 0);
     CHECK(std::string_view{"hello world."} == buf);
     handler->pread(std::as_writable_bytes(std::span{buf}.subspan(0, 4)), 256);
@@ -187,4 +187,35 @@ TEST_CASE(
   CHECK(deserialized_bb.ino == original_bb.ino);
   CHECK(deserialized_bb.global_tree == original_bb.global_tree);
   CHECK(deserialized_bb.local_tree == original_bb.local_tree);
+}
+
+TEST_CASE("Testing bb_handler::pwrite and sync methods") {
+  topology topo{};
+  rpm rpm{std::cref(topo), "/tmp/pmem2_devtest",
+          (2ULL << 20) * topo.intra_size()};
+  auto store = bb_store{rpm};
+
+  const auto filename = "/tmp/bb_test_file";
+  const auto data = std::string("Hello, world!");
+  const auto buf = std::as_bytes(std::span{data});
+
+  auto fd = ::open(filename, O_RDWR | O_CREAT, 0644);
+  REQUIRE(fd >= 0);
+
+  auto handler = store.open(fd);
+  REQUIRE(handler != nullptr);
+
+  SUBCASE("Write using handler->pwrite") {
+    handler->pwrite(buf, topo.rank() * 1024);
+    CHECK(handler->size() == data.size() + topo.rank() * 1024);
+    handler->sync();
+    CHECK(handler->size() == data.size() + (topo.size() - 1) * 1024);
+  }
+
+  SUBCASE("Write directly to file using ::pwrite") {
+    ::pwrite(fd, data.data(), data.size(), 0);
+    CHECK(handler->size() == data.size());
+  }
+
+  ::close(fd);
 }

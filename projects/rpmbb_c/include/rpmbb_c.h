@@ -40,6 +40,7 @@ ssize_t rpmbb_bb_pread(rpmbb_handler_t handler,
                        size_t count,
                        off_t offset);
 int rpmbb_bb_sync(rpmbb_handler_t handler);
+int rpmbb_bb_size(rpmbb_handler_t handler, size_t* size);
 
 #ifdef __cplusplus
 }

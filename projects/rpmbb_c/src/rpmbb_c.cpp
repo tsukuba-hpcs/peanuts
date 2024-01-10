@@ -97,4 +97,12 @@ int rpmbb_bb_sync(rpmbb_handler_t handler) try {
   return -1;
 }
 
+int rpmbb_bb_size(rpmbb_handler_t handler, size_t* size) try {
+  auto cpp_handler = reinterpret_cast<rpmbb::bb_handler*>(handler->handler);
+  *size = cpp_handler->size();
+  return 0;
+} catch (...) {
+  return -1;
+}
+
 }  // extern "C"

@@ -60,6 +60,20 @@ class bb_handler {
 
   auto has_valid_file() const -> bool { return static_cast<bool>(file_); }
 
+  auto size() const -> size_t {
+    size_t size = 0;
+    if (bb_->global_tree.size() != 0) {
+      size = bb_->global_tree.back().ex.end;
+    }
+    if (bb_->local_tree.size() != 0) {
+      size = std::max(size, bb_->local_tree.back().ex.end);
+    }
+    if (has_valid_file()) {
+      size = std::max(size, file_.size());
+    }
+    return size;
+  }
+
   auto sync() {
     // serialize local extent tree
     auto [ser_local_tree, out] = zpp::bits::data_out();
