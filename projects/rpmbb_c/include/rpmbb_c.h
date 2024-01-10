@@ -28,7 +28,9 @@ int rpmbb_store_free(rpmbb_store_t store);
 int rpmbb_store_save(rpmbb_store_t store);
 int rpmbb_store_load(rpmbb_store_t store);
 
-rpmbb_handler_t rpmbb_store_open_attach(rpmbb_store_t store, int fd);
+rpmbb_handler_t rpmbb_store_open_attach(rpmbb_store_t store,
+                                        MPI_Comm comm,
+                                        int fd);
 int rpmbb_store_unlink(rpmbb_store_t store, int fd);
 
 int rpmbb_bb_close(rpmbb_handler_t handler);
@@ -40,6 +42,12 @@ ssize_t rpmbb_bb_pread(rpmbb_handler_t handler,
                        void* buf,
                        size_t count,
                        off_t offset);
+
+ssize_t rpmbb_bb_pread_aggregate(rpmbb_handler_t handler,
+                                 void* buf,
+                                 size_t count,
+                                 off_t offset);
+int rpmbb_bb_wait(rpmbb_handler_t handler);
 int rpmbb_bb_sync(rpmbb_handler_t handler);
 int rpmbb_bb_size(rpmbb_handler_t handler, size_t* size);
 

@@ -51,7 +51,7 @@ TEST_CASE("rpmbb store and handler operations") {
     int fd = open(files[0].c_str(), O_RDWR | O_CREAT, 0644);
     REQUIRE(fd >= 0);
 
-    auto handler = rpmbb_store_open_attach(store, fd);
+    auto handler = rpmbb_store_open_attach(store, MPI_COMM_WORLD, fd);
     REQUIRE(handler != nullptr);
 
     const char* test_data = "Hello, rpmbb!";

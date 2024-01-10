@@ -47,14 +47,16 @@ class bb_handler {
              local_ring_buffer& local_ring,
              const std::vector<remote_ring_buffer>& remote_rings,
              std::shared_ptr<bb> bb,
+             mpi::comm comm,
              zpp::filesystem::weak_file_handle fd =
                  zpp::filesystem::weak_file::invalid_file_handle)
       : rpm_ref_{std::ref(rpm_ref)},
         local_ring_{std::ref(local_ring)},
         remote_rings_{std::cref(remote_rings)},
         bb_{std::move(bb)},
+        comm_{std::move(comm)},
         file_{fd},
-        rank_{rpm().topo().rank()} {}
+        global_rank_{rpm().topo().rank()} {}
 
   auto bb_ref() -> rpmbb::bb& { return *bb_; }
 
@@ -82,15 +84,14 @@ class bb_handler {
     // all_gather serialized local tree size
     const auto& topo = rpm().topo();
     auto sizes = std::vector<int>(topo.size());
-    topo.comm().all_gather(static_cast<int>(ser_local_tree.size()),
-                           std::span{sizes});
+    comm_.all_gather(static_cast<int>(ser_local_tree.size()), std::span{sizes});
 
     // all_gather_v serialized local tree
     auto [ser_local_trees, in] = zpp::bits::data_in();
     ser_local_trees.resize(std::accumulate(sizes.begin(), sizes.end(), 0ULL));
-    topo.comm().all_gather_v(std::as_bytes(std::span{ser_local_tree}),
-                             std::as_writable_bytes(std::span{ser_local_trees}),
-                             std::span{sizes});
+    comm_.all_gather_v(std::as_bytes(std::span{ser_local_tree}),
+                       std::as_writable_bytes(std::span{ser_local_trees}),
+                       std::span{sizes});
 
     // deserialize remote local trees and merge into global tree
     auto tmp_tree = extent_tree{};
@@ -110,11 +111,19 @@ class bb_handler {
                               "ring buffer full"};
     }
     ring().pwrite(buf, *lsn);
-    bb_->local_tree.add(ofs, ofs + buf.size(), *lsn, rank_);
+    bb_->local_tree.add(ofs, ofs + buf.size(), *lsn, global_rank_);
     return buf.size();
   }
 
+  auto flush() const -> void { rring(0).flush(); }
+
   auto pread(std::span<std::byte> buf, off_t ofs) const -> ssize_t {
+    auto ret = pread_noflush(buf, ofs);
+    flush();
+    return ret;
+  }
+
+  auto pread_noflush(std::span<std::byte> buf, off_t ofs) const -> ssize_t {
     auto el = extent_list{};
     auto user_buf_extent = extent{static_cast<uint64_t>(ofs),
                                   static_cast<uint64_t>(ofs) + buf.size()};
@@ -179,7 +188,6 @@ class bb_handler {
 
       hole_el = el.inverse(user_buf_extent);
       if (hole_el.empty()) {
-        rring(0).flush();
         return buf.size();
       }
     }
@@ -216,9 +224,6 @@ class bb_handler {
       }
     }
 
-    // make sure read from all remote rings are completed
-    rring(0).flush();
-
     if (ofs + buf.size() >= eof) {
       return eof - ofs;
     } else {
@@ -238,8 +243,9 @@ class bb_handler {
   std::reference_wrapper<local_ring_buffer> local_ring_;
   std::reference_wrapper<const std::vector<remote_ring_buffer>> remote_rings_;
   std::shared_ptr<bb> bb_;
+  mpi::comm comm_;
   zpp::filesystem::weak_file file_;
-  int rank_;
+  int global_rank_;
 };
 
 class bb_store {
@@ -305,16 +311,24 @@ class bb_store {
     }
   }
 
-  std::unique_ptr<bb_handler> open(ino_t ino, int fd) {
+  auto open(mpi::comm comm, ino_t ino, int fd) -> std::unique_ptr<bb_handler> {
     auto bb_obj = std::make_shared<bb>(bb{ino});
     auto [it, inserted] = bb_store_.insert(bb_obj);
     if (fd >= 0) {
-      return std::make_unique<bb_handler>(rpm_ref_.get(), local_ring_,
-                                          remote_rings_, *it, fd);
+      return std::make_unique<bb_handler>(
+          rpm_ref_.get(), local_ring_, remote_rings_, *it, std::move(comm), fd);
     } else {
       return std::make_unique<bb_handler>(rpm_ref_.get(), local_ring_,
-                                          remote_rings_, *it);
+                                          remote_rings_, *it, std::move(comm));
     }
+  }
+  auto open(mpi::comm comm, int fd) -> std::unique_ptr<bb_handler> {
+    return open(std::move(comm), utils::get_ino(fd), fd);
+  }
+
+  std::unique_ptr<bb_handler> open(ino_t ino, int fd) {
+    return open(mpi::comm{rpm_ref_.get().topo().comm().native(), false}, ino,
+                fd);
   }
 
   std::unique_ptr<bb_handler> open(int fd) {
