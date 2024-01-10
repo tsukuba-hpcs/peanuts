@@ -34,6 +34,11 @@ struct comm_deleter {
   void operator()(pointer comm) const { MPI_Comm_free(&comm.native); }
 };
 
+struct group_deleter {
+  using pointer = native_handle<MPI_Group, MPI_GROUP_NULL>;
+  void operator()(pointer group) const { MPI_Group_free(&group.native); }
+};
+
 struct win_deleter {
   using pointer = native_handle<MPI_Win, MPI_WIN_NULL>;
   void operator()(pointer win) const { MPI_Win_free(&win.native); }
@@ -59,6 +64,8 @@ struct request_deleter {
 using unique_env = std::unique_ptr<void, detail::env_deleter>;
 using unique_comm =
     std::unique_ptr<void, utils::cond_deleter<detail::comm_deleter>>;
+using unique_group =
+    std::unique_ptr<void, utils::cond_deleter<detail::group_deleter>>;
 using unique_win = std::unique_ptr<void, detail::win_deleter>;
 using unique_info = std::unique_ptr<void, detail::info_deleter>;
 using unique_dtype =

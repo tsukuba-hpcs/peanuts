@@ -9,6 +9,7 @@ using namespace rpmbb;
 
 #include <mpi.h>
 #include <mutex>
+#include <numeric>
 #include <span>
 #include <thread>
 
@@ -53,6 +54,39 @@ TEST_CASE("mpi::runtime") {
   CHECK(rpmbb::mpi::runtime::is_thread_main() == true);
   MESSAGE(rpmbb::mpi::runtime::processor_name());
   CHECK(rpmbb::mpi::runtime::processor_name().size() > 0);
+}
+
+TEST_CASE("group") {
+  const auto& comm = rpmbb::mpi::comm::world();
+  CHECK(comm.size() == doctest::mpi_comm_world_size());
+  auto group = comm.group();
+  auto ranks = std::vector<int>(comm.size());
+  std::iota(ranks.begin(), ranks.end(), 0);
+
+  SUBCASE("group") {
+    CHECK(group.size() == comm.size());
+    CHECK(group.rank() == comm.rank());
+  }
+
+  if (comm.size() > 1) {
+    SUBCASE("group::include") {
+      auto new_group = group.include(std::span{ranks}.subspan(1));
+      CHECK(new_group.size() == group.size() - 1);
+    }
+
+    SUBCASE("group::exclude") {
+      auto new_group = group.exclude(std::span{ranks}.subspan(1));
+      CHECK(new_group.size() == 1);
+    }
+
+    SUBCASE("group::translate_ranks") {
+      auto new_group = group.exclude(std::span{ranks}.subspan(1));
+      auto conv_ranks = group.translate_ranks(std::span{ranks}, new_group);
+      CHECK(conv_ranks.size() == ranks.size());
+      CHECK(conv_ranks[0] == 0);
+      CHECK(conv_ranks[1] == MPI_UNDEFINED);
+    }
+  }
 }
 
 TEST_CASE("comm") {

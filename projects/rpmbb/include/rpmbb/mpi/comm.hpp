@@ -5,6 +5,7 @@
 #include "rpmbb/mpi/detail/container_adapter.hpp"
 #include "rpmbb/mpi/dtype.hpp"
 #include "rpmbb/mpi/error.hpp"
+#include "rpmbb/mpi/group.hpp"
 #include "rpmbb/mpi/info.hpp"
 #include "rpmbb/mpi/raii.hpp"
 #include "rpmbb/mpi/status.hpp"
@@ -64,6 +65,12 @@ class comm {
     int result;
     MPI_CHECK_ERROR_CODE(MPI_Comm_size(native(), &result));
     return result;
+  }
+
+  auto group() const -> group {
+    MPI_Group group;
+    MPI_CHECK_ERROR_CODE(MPI_Comm_group(native(), &group));
+    return mpi::group{group, true};
   }
 
   auto barrier() const -> void { MPI_CHECK_ERROR_CODE(MPI_Barrier(native())); }
