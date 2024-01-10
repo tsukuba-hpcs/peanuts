@@ -29,6 +29,7 @@ int rpmbb_store_save(rpmbb_store_t store);
 int rpmbb_store_load(rpmbb_store_t store);
 
 rpmbb_handler_t rpmbb_store_open_attach(rpmbb_store_t store, int fd);
+int rpmbb_store_unlink(rpmbb_store_t store, int fd);
 
 int rpmbb_bb_close(rpmbb_handler_t handler);
 ssize_t rpmbb_bb_pwrite(rpmbb_handler_t handler,

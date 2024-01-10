@@ -60,6 +60,14 @@ rpmbb_handler_t rpmbb_store_open_attach(rpmbb_store_t store, int fd) try {
   return nullptr;
 }
 
+int rpmbb_store_unlink(rpmbb_store_t store, int fd) try {
+  auto cpp_store = reinterpret_cast<rpmbb::bb_store*>(store->store);
+  cpp_store->unlink(fd);
+  return 0;
+} catch (...) {
+  return -1;
+}
+
 int rpmbb_bb_close(rpmbb_handler_t handler) {
   delete reinterpret_cast<rpmbb::bb_handler*>(handler->handler);
   free(handler);
