@@ -21,6 +21,8 @@ class Rpmbb(CMakePackage):
 
     depends_on("mpi")
     depends_on("pmdk+ndctl")
+    depends_on("liburing")
+    depends_on("pkgconfig", type="build")
 
     conflicts("%gcc@:9")
 
