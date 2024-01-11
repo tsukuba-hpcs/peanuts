@@ -8,6 +8,10 @@ from spack.pkg.builtin.openmpi import Openmpi as BuiltinOpenmpi
 
 class Openmpi(BuiltinOpenmpi):
 
+    git = "https://github.com/tsukuba-hpcs/ompi-pmembb.git"
+
+    version("5.0.0rc12-pmembb", branch="pmembb", submodules=True)
+
     variant('pmembb', default=False, description='Support pmembb', when='+romio')
     variant('debug', default=False, description='Enable debug')
 
