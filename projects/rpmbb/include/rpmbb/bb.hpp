@@ -96,6 +96,9 @@ class bb_handler {
     // deserialize remote local trees and merge into global tree
     auto tmp_tree = extent_tree{};
     for (size_t i = 0; i < sizes.size(); ++i) {
+      if (in.remaining_data().empty()) {
+        break;
+      }
       in(tmp_tree).or_throw();
       bb_->global_tree.merge(tmp_tree);
     }

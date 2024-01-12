@@ -129,6 +129,14 @@ TEST_CASE("bb_store") {
               dat.size() * topo.rank());
     CHECK(std::equal(dat.begin(), dat.end(), dat2.begin(), dat2.end()));
   }
+
+  SUBCASE("sync empty file") {
+    auto fd = raii::file_descriptor{::open("/tmp/bb_store_test_file4",
+                                           O_RDWR | O_CREAT, 0644)};
+    auto handler = store.open(fd.get());
+    CHECK(handler != nullptr);
+    CHECK_NOTHROW(handler->sync());
+  }
 }
 
 TEST_CASE("Testing serialization and deserialization of bb") {

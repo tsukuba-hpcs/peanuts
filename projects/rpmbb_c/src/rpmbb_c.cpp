@@ -122,6 +122,11 @@ int rpmbb_bb_sync(rpmbb_handler_t handler) try {
   auto cpp_handler = reinterpret_cast<rpmbb::bb_handler*>(handler->handler);
   cpp_handler->sync();
   return 0;
+} catch (const std::exception& e) {
+#ifndef NDEBUG
+  fprintf(stderr, "rpmbb_bb_sync: %s\n", e.what());
+#endif
+  return -1;
 } catch (...) {
   return -1;
 }
