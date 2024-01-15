@@ -142,4 +142,12 @@ int rpmbb_bb_size(rpmbb_handler_t handler, size_t* size) try {
   return -1;
 }
 
+int rpmbb_bb_truncate(rpmbb_handler_t handler, size_t size) try {
+  auto cpp_handler = reinterpret_cast<rpmbb::bb_handler*>(handler->handler);
+  cpp_handler->truncate(size);
+  return 0;
+} catch (...) {
+  return -1;
+}
+
 }  // extern "C"

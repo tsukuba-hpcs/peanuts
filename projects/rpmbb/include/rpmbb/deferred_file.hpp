@@ -59,6 +59,13 @@ class deferred_file {
     return file_->size();
   }
 
+  auto truncate(size_t size) -> void {
+    if (!is_open()) {
+      open();
+    }
+    file_->truncate(size);
+  }
+
   auto pread(zpp::byte_view buf, off_t offset) -> ssize_t {
     if (!is_open()) {
       open();

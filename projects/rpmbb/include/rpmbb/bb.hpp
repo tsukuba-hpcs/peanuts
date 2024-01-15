@@ -75,6 +75,20 @@ class bb_handler {
     return size;
   }
 
+  // collective
+  auto truncate(size_t size) -> void {
+    if (comm_.rank() == 0) {
+      file_.truncate(size);
+    }
+
+    if (bb_->local_tree.size() != 0 && bb_->local_tree.back().ex.end > size) {
+      bb_->local_tree.remove(size, UINT64_MAX);
+    }
+
+    deferred_file_size_ = size;
+  }
+
+  // collective
   auto sync() {
     // serialize local extent tree
     auto [ser_local_tree, out] = zpp::bits::data_out();
