@@ -214,20 +214,8 @@ auto main(int argc, char* argv[]) -> int try {
   sw.reset();
   topo.comm().barrier();
 
-  // FIXME: should not open file by each process
-  zpp::filesystem::file file;
-  mpi::run_on_rank0([&] {
-    file = zpp::filesystem::file(zpp::filesystem::file_handle{
-        ::open(test_file_path.c_str(), O_RDWR | O_CREAT, 0644)});
-  });
-  topo.comm().barrier();
-
-  if (topo.rank() != 0) {
-    file = zpp::filesystem::open(test_file_path,
-                                 zpp::filesystem::open_mode::read_write);
-  }
-
-  auto handler = store.open(file.get());
+  auto handler = store.open(mpi::comm{topo.comm().native(), false},
+                            test_file_path, O_RDWR | O_CREAT, 0644);
 
   topo.comm().barrier();
   time_json["time_open"] = sw.get().count();

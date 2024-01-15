@@ -28,10 +28,12 @@ int rpmbb_store_free(rpmbb_store_t store);
 int rpmbb_store_save(rpmbb_store_t store);
 int rpmbb_store_load(rpmbb_store_t store);
 
-rpmbb_handler_t rpmbb_store_open_attach(rpmbb_store_t store,
-                                        MPI_Comm comm,
-                                        int fd);
-int rpmbb_store_unlink(rpmbb_store_t store, int fd);
+rpmbb_handler_t rpmbb_store_open(rpmbb_store_t store,
+                                 MPI_Comm comm,
+                                 const char* pathname,
+                                 int flags,
+                                 mode_t mode);
+int rpmbb_store_unlink(rpmbb_store_t store, const char* pathname);
 
 int rpmbb_bb_close(rpmbb_handler_t handler);
 ssize_t rpmbb_bb_pwrite(rpmbb_handler_t handler,

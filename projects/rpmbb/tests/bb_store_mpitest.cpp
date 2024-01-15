@@ -46,9 +46,8 @@ TEST_CASE("bb_store save/load") {
     topology topo{};
     rpm rpm{std::cref(topo), pmem_path, (2ULL << 20) * topo.intra_size()};
     auto store = bb_store{rpm};
-    auto file = zpp::filesystem::file(zpp::filesystem::file_handle{
-        ::open(file_path, O_RDWR | O_CREAT, 0644)});
-    auto handler = store.open(file.get());
+    auto handler = store.open(mpi::comm{MPI_COMM_WORLD}, file_path,
+                              O_RDWR | O_CREAT, 0644);
     // MESSAGE("ino: ", utils::get_ino(file.get()));
     handler->pwrite(std::as_bytes(std::span{"hello world.", 12}), 0);
     handler->pwrite(std::as_bytes(std::span{"hoge", 4}), 256);
@@ -61,9 +60,8 @@ TEST_CASE("bb_store save/load") {
     rpm rpm{std::cref(topo), pmem_path, (2ULL << 20) * topo.intra_size()};
     auto store = bb_store{rpm};
     store.load();
-    auto file = zpp::filesystem::file(zpp::filesystem::file_handle{
-        ::open(file_path, O_RDWR | O_CREAT, 0644)});
-    auto handler = store.open(file.get());
+    auto handler = store.open(mpi::comm{MPI_COMM_WORLD}, file_path,
+                              O_RDWR | O_CREAT, 0644);
     std::string buf(12, '\0');
     handler->pread(std::as_writable_bytes(std::span{buf}), 0);
     CHECK(std::string_view{"hello world."} == buf);
@@ -79,40 +77,25 @@ TEST_CASE("bb_store") {
   rpm rpm{std::cref(topo), "/tmp/pmem2_devtest",
           (2ULL << 20) * topo.intra_size()};
   auto store = bb_store{rpm};
+  const auto files = std::vector<std::string>{"/tmp/bb_store_test_file1",
+                                              "/tmp/bb_store_test_file2",
+                                              "/tmp/bb_store_test_file3"};
+  auto h1 =
+      store.open(mpi::comm{MPI_COMM_WORLD}, files[0], O_RDWR | O_CREAT, 0644);
+  auto h2 =
+      store.open(mpi::comm{MPI_COMM_WORLD}, files[1], O_RDWR | O_CREAT, 0644);
+  auto h3 =
+      store.open(mpi::comm{MPI_COMM_WORLD}, files[2], O_RDWR | O_CREAT, 0644);
 
   SUBCASE("basic usage senario") {
-    const auto files = std::vector<std::string>{"/tmp/bb_store_test_file1",
-                                                "/tmp/bb_store_test_file2",
-                                                "/tmp/bb_store_test_file3"};
-
-    auto fd1 =
-        raii::file_descriptor{::open(files[0].c_str(), O_RDWR | O_CREAT, 0644)};
-    auto fd2 =
-        raii::file_descriptor{::open(files[1].c_str(), O_RDWR | O_CREAT, 0644)};
-    auto handler1 = store.open(fd1.get());
-    auto handler2 = store.open(fd2.get());
-
-    CHECK(handler1 != nullptr);
-    CHECK(handler2 != nullptr);
-
-    auto ino1 = utils::get_ino(fd1.get());
-    store.unlink(fd1.get());
-
-    auto fd3 =
-        raii::file_descriptor{::open(files[2].c_str(), O_RDWR | O_CREAT, 0644)};
-
-    // Open new object with same id as unlinked
-    auto handler3 = store.open(ino1, fd3.get());
-
-    CHECK(handler3 != nullptr);
+    CHECK(h1 != nullptr);
+    CHECK(h2 != nullptr);
+    store.unlink(files[0]);
   }
 
   SUBCASE("save and load") {
     auto dat = fmt::format("myrank: {}", topo.rank());
     {
-      auto h1 = store.open(ino_t{1});
-      auto h2 = store.open(ino_t{2});
-
       h2->pwrite(std::as_bytes(std::span{dat.data(), dat.size()}),
                  dat.size() * topo.rank());
       h2->sync();
@@ -121,9 +104,10 @@ TEST_CASE("bb_store") {
 
     auto store2 = bb_store{rpm};
     store2.load();
-    CHECK(store2.open(ino_t{1}) != nullptr);
-    auto h2 = store2.open(ino_t{2});
-    CHECK(h2 != nullptr);
+    CHECK(store2.open(mpi::comm{MPI_COMM_WORLD}, files[0], O_RDWR | O_CREAT,
+                      0644) != nullptr);
+    auto h2_2 = store2.open(mpi::comm{MPI_COMM_WORLD}, files[1], O_RDWR, 0644);
+    CHECK(h2_2 != nullptr);
     auto dat2 = std::vector<char>(dat.size());
     h2->pread(std::as_writable_bytes(std::span{dat2}),
               dat.size() * topo.rank());
@@ -131,11 +115,7 @@ TEST_CASE("bb_store") {
   }
 
   SUBCASE("sync empty file") {
-    auto fd = raii::file_descriptor{::open("/tmp/bb_store_test_file4",
-                                           O_RDWR | O_CREAT, 0644)};
-    auto handler = store.open(fd.get());
-    CHECK(handler != nullptr);
-    CHECK_NOTHROW(handler->sync());
+    CHECK_NOTHROW(h3->sync());
   }
 }
 
@@ -207,10 +187,10 @@ TEST_CASE("Testing bb_handler::pwrite and sync methods") {
   const auto data = std::string("Hello, world!");
   const auto buf = std::as_bytes(std::span{data});
 
-  auto fd = ::open(filename, O_RDWR | O_CREAT, 0644);
+  auto fd = ::open(filename, O_RDWR | O_CREAT | O_TRUNC, 0644);
   REQUIRE(fd >= 0);
 
-  auto handler = store.open(fd);
+  auto handler = store.open(mpi::comm{MPI_COMM_WORLD}, filename, O_RDWR, 0644);
   REQUIRE(handler != nullptr);
 
   SUBCASE("Write using handler->pwrite") {
@@ -222,6 +202,8 @@ TEST_CASE("Testing bb_handler::pwrite and sync methods") {
 
   SUBCASE("Write directly to file using ::pwrite") {
     ::pwrite(fd, data.data(), data.size(), 0);
+    CHECK(handler->size() != data.size());
+    handler->sync();
     CHECK(handler->size() == data.size());
   }
 

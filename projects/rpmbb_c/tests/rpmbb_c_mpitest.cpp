@@ -48,10 +48,8 @@ TEST_CASE("rpmbb store and handler operations") {
     const auto files = std::vector<std::string>{"./bb_store_test_file1",
                                                 "./bb_store_test_file2",
                                                 "./bb_store_test_file3"};
-    int fd = open(files[0].c_str(), O_RDWR | O_CREAT, 0644);
-    REQUIRE(fd >= 0);
-
-    auto handler = rpmbb_store_open_attach(store, MPI_COMM_WORLD, fd);
+    auto handler = rpmbb_store_open(store, MPI_COMM_WORLD, files[0].c_str(),
+                                    O_RDWR | O_CREAT, 0644);
     REQUIRE(handler != nullptr);
 
     const char* test_data = "Hello, rpmbb!";
@@ -68,8 +66,6 @@ TEST_CASE("rpmbb store and handler operations") {
 
     int close_result = rpmbb_bb_close(handler);
     CHECK(close_result == 0);
-
-    close(fd);
   }
 
   int free_result = rpmbb_store_free(store);

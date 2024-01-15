@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rpmbb/deferred_file.hpp"
 #include "rpmbb/extent_list.hpp"
 #include "rpmbb/extent_tree.hpp"
 #include "rpmbb/raii/fd.hpp"
@@ -48,19 +49,18 @@ class bb_handler {
              const std::vector<remote_ring_buffer>& remote_rings,
              std::shared_ptr<bb> bb,
              mpi::comm comm,
-             zpp::filesystem::weak_file_handle fd =
-                 zpp::filesystem::weak_file::invalid_file_handle)
+             rpmbb::deferred_file&& file,
+             size_t initial_file_size)
       : rpm_ref_{std::ref(rpm_ref)},
         local_ring_{std::ref(local_ring)},
         remote_rings_{std::cref(remote_rings)},
         bb_{std::move(bb)},
         comm_{std::move(comm)},
-        file_{fd},
-        global_rank_{rpm().topo().rank()} {}
+        file_{std::move(file)},
+        global_rank_{rpm().topo().rank()},
+        deferred_file_size_{initial_file_size} {}
 
   auto bb_ref() -> rpmbb::bb& { return *bb_; }
-
-  auto has_valid_file() const -> bool { return static_cast<bool>(file_); }
 
   auto size() const -> size_t {
     size_t size = 0;
@@ -70,9 +70,8 @@ class bb_handler {
     if (bb_->local_tree.size() != 0) {
       size = std::max(size, bb_->local_tree.back().ex.end);
     }
-    if (has_valid_file()) {
-      size = std::max(size, file_.size());
-    }
+
+    size = std::max(size, deferred_file_size_);
     return size;
   }
 
@@ -105,6 +104,8 @@ class bb_handler {
 
     // clear merged local tree
     bb_->local_tree.clear();
+
+    deferred_file_size_ = get_and_broadcast_file_size();
   }
 
   auto pwrite(std::span<const std::byte> buf, off_t ofs) const -> ssize_t {
@@ -120,13 +121,13 @@ class bb_handler {
 
   auto flush() const -> void { rring(0).flush(); }
 
-  auto pread(std::span<std::byte> buf, off_t ofs) const -> ssize_t {
+  auto pread(std::span<std::byte> buf, off_t ofs) -> ssize_t {
     auto ret = pread_noflush(buf, ofs);
     flush();
     return ret;
   }
 
-  auto pread_noflush(std::span<std::byte> buf, off_t ofs) const -> ssize_t {
+  auto pread_noflush(std::span<std::byte> buf, off_t ofs) -> ssize_t {
     auto el = extent_list{};
     auto user_buf_extent = extent{static_cast<uint64_t>(ofs),
                                   static_cast<uint64_t>(ofs) + buf.size()};
@@ -198,8 +199,8 @@ class bb_handler {
     // read remaining from file
     for (auto it = hole_el.begin(); it != hole_el.end(); ++it) {
       const auto& hole_ex = *it;
-      file_.seek(hole_ex.begin, zpp::filesystem::seek_mode::set);
-      auto rsize = file_.read(buf.subspan(hole_ex.begin - ofs, hole_ex.size()));
+      auto rsize = file_.pread(buf.subspan(hole_ex.begin - ofs, hole_ex.size()),
+                               hole_ex.begin);
       auto remain = hole_ex.size() - rsize;
       if (remain > 0) {
         // reach the end of file,
@@ -241,14 +242,31 @@ class bb_handler {
   }
   auto rpm() const -> rpm& { return rpm_ref_.get(); }
 
+  auto get_and_broadcast_file_size() -> ssize_t {
+    ssize_t file_size = -1;
+    if (comm_.rank() == 0) {
+      try {
+        file_size = file_.size();
+      } catch (...) {
+      }
+    }
+    comm_.broadcast(file_size);
+    if (file_size < 0) {
+      throw std::system_error{errno, std::system_category(),
+                              "Failed to get file size"};
+    }
+    return file_size;
+  }
+
  private:
   std::reference_wrapper<rpmbb::rpm> rpm_ref_;
   std::reference_wrapper<local_ring_buffer> local_ring_;
   std::reference_wrapper<const std::vector<remote_ring_buffer>> remote_rings_;
   std::shared_ptr<bb> bb_;
   mpi::comm comm_;
-  zpp::filesystem::weak_file file_;
+  deferred_file file_;
   int global_rank_;
+  size_t deferred_file_size_ = 0;
 };
 
 class bb_store {
@@ -314,32 +332,49 @@ class bb_store {
     }
   }
 
-  auto open(mpi::comm comm, ino_t ino, int fd) -> std::unique_ptr<bb_handler> {
+  auto open(mpi::comm comm,
+            const std::string& pathname,
+            int flags,
+            mode_t mode) {
+    if (comm.rank() != 0) {
+      flags &= ~(O_CREAT | O_EXCL | O_TRUNC);
+    }
+
+    rpmbb::deferred_file file{pathname, flags, mode};
+    ino_t ino;
+    ssize_t file_size = -1;
+    try {
+      if (comm.rank() == 0) {
+        file.open();
+
+        struct stat stat_buf;
+        if (fstat(file.fd(), &stat_buf) != 0) {
+          throw std::system_error(errno, std::system_category(),
+                                  "bb_store::open(): Failed fstat");
+        }
+
+        ino = stat_buf.st_ino;
+        file_size = stat_buf.st_size;
+      }
+    } catch (...) {
+    }
+
+    // TODO: make derived datatype for file_size and ino then broadcast once
+    comm.broadcast(file_size);
+    if (file_size < 0) {
+      throw std::system_error{errno, std::system_category(),
+                              "bb_store::open(): Failed to get file size"};
+    }
+    comm.broadcast(ino);
+
     auto bb_obj = std::make_shared<bb>(bb{ino});
     auto [it, inserted] = bb_store_.insert(bb_obj);
-    if (fd >= 0) {
-      return std::make_unique<bb_handler>(
-          rpm_ref_.get(), local_ring_, remote_rings_, *it, std::move(comm), fd);
-    } else {
-      return std::make_unique<bb_handler>(rpm_ref_.get(), local_ring_,
-                                          remote_rings_, *it, std::move(comm));
-    }
-  }
-  auto open(mpi::comm comm, int fd) -> std::unique_ptr<bb_handler> {
-    return open(std::move(comm), utils::get_ino(fd), fd);
+    return std::make_unique<bb_handler>(rpm_ref_.get(), local_ring_,
+                                        remote_rings_, *it, std::move(comm),
+                                        std::move(file), file_size);
   }
 
-  std::unique_ptr<bb_handler> open(ino_t ino, int fd) {
-    return open(mpi::comm{rpm_ref_.get().topo().comm().native(), false}, ino,
-                fd);
-  }
-
-  std::unique_ptr<bb_handler> open(int fd) {
-    return open(utils::get_ino(fd), fd);
-  }
-
-  std::unique_ptr<bb_handler> open(ino_t ino) { return open(ino, -1); }
-
+  void unlink(const std::string& pathname) { unlink(utils::get_ino(pathname)); }
   void unlink(ino_t ino) { bb_store_.erase(std::make_shared<bb>(bb{ino})); }
   void unlink(int fd) { unlink(utils::get_ino(fd)); }
 

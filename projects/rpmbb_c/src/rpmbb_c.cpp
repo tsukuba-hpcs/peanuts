@@ -49,11 +49,14 @@ int rpmbb_store_load(rpmbb_store_t store) try {
   return -1;
 }
 
-rpmbb_handler_t rpmbb_store_open_attach(rpmbb_store_t store,
-                                        MPI_Comm comm,
-                                        int fd) try {
+rpmbb_handler_t rpmbb_store_open(rpmbb_store_t store,
+                                 MPI_Comm comm,
+                                 const char* pathname,
+                                 int flags,
+                                 mode_t mode) try {
   auto cpp_store = reinterpret_cast<rpmbb::bb_store*>(store->store);
-  auto cpp_handler = cpp_store->open(rpmbb::mpi::comm{comm, false}, fd);
+  auto cpp_handler =
+      cpp_store->open(rpmbb::mpi::comm{comm, false}, pathname, flags, mode);
   auto handler =
       static_cast<rpmbb_handler_t>(std::malloc(sizeof(rpmbb_handler)));
   handler->handler = cpp_handler.release();
@@ -62,9 +65,9 @@ rpmbb_handler_t rpmbb_store_open_attach(rpmbb_store_t store,
   return nullptr;
 }
 
-int rpmbb_store_unlink(rpmbb_store_t store, int fd) try {
+int rpmbb_store_unlink(rpmbb_store_t store, const char* pathname) try {
   auto cpp_store = reinterpret_cast<rpmbb::bb_store*>(store->store);
-  cpp_store->unlink(fd);
+  cpp_store->unlink(pathname);
   return 0;
 } catch (...) {
   return -1;
