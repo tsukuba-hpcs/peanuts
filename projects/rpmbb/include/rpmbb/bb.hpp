@@ -77,8 +77,19 @@ class bb_handler {
 
   // collective
   auto truncate(size_t size) -> void {
+    int truncated = 0;
     if (comm_.rank() == 0) {
-      file_.truncate(size);
+      try {
+        file_.truncate(size);
+      } catch (...) {
+        truncated = -1;
+      }
+    }
+
+    comm_.broadcast(truncated);
+    if (truncated != 0) {
+      throw std::system_error{errno, std::system_category(),
+                              "Failed to truncate file"};
     }
 
     if (bb_->local_tree.size() != 0 && bb_->local_tree.back().ex.end > size) {
