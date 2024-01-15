@@ -2,6 +2,7 @@
 
 #include "rpmbb/mpi/error.hpp"
 #include "rpmbb/mpi/raii.hpp"
+#include "rpmbb/mpi/type.hpp"
 #include "rpmbb/utils/singleton.hpp"
 
 #include <mpi.h>
@@ -18,6 +19,16 @@ class dtype {
   explicit dtype(const dtype& base, const int count) {
     MPI_Datatype new_dtype;
     MPI_CHECK_ERROR_CODE(MPI_Type_contiguous(count, base, &new_dtype));
+    dtype_ = raii::unique_dtype{new_dtype, true};
+  }
+
+  dtype(const std::vector<MPI_Datatype>& dtypes,
+        const std::vector<int>& block_lengths,
+        const std::vector<MPI_Aint>& displacements) {
+    MPI_Datatype new_dtype;
+    MPI_CHECK_ERROR_CODE(MPI_Type_create_struct(
+        static_cast<int>(block_lengths.size()), block_lengths.data(),
+        displacements.data(), dtypes.data(), &new_dtype));
     dtype_ = raii::unique_dtype{new_dtype, true};
   }
 
@@ -57,6 +68,31 @@ class dtype {
     auto [num_integers, num_addresses, num_dtypes, combiner] = get_envelope();
     return num_integers == 0 && num_addresses == 0 && num_dtypes == 0 &&
            combiner == MPI_COMBINER_NAMED;
+  }
+
+  auto size() const -> int {
+    int size;
+    MPI_CHECK_ERROR_CODE(MPI_Type_size(native(), &size));
+    return size;
+  }
+
+  auto size_x() const -> mpi::count {
+    mpi::count size;
+    MPI_CHECK_ERROR_CODE(MPI_Type_size_x(native(), &size));
+    return size;
+  }
+
+  auto extent() const -> std::array<aint, 2> {
+    std::array<aint, 2> ret{};
+    MPI_CHECK_ERROR_CODE(
+        MPI_Type_get_extent(native(), &ret[0].native(), &ret[1].native()));
+    return ret;
+  }
+
+  auto extent_x() const -> std::array<count, 2> {
+    std::array<count, 2> ret{};
+    MPI_CHECK_ERROR_CODE(MPI_Type_get_extent_x(native(), &ret[0], &ret[1]));
+    return ret;
   }
 };
 

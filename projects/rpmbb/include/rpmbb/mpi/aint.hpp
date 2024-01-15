@@ -23,6 +23,8 @@ class aint {
 
   MPI_Aint native() const { return addr_; }
   operator MPI_Aint() const { return addr_; }
+  MPI_Aint& native() { return addr_; }
+  operator MPI_Aint&() { return addr_; }
 
   auto operator+(aint disp) -> aint const {
     return MPI_Aint_add(addr_, disp.addr_);

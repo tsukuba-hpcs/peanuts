@@ -277,13 +277,19 @@ class bb_store {
   };
   static_assert(std::is_trivially_copyable_v<block_metadata>);
 
+  struct ino_and_size {
+    ino_t ino;
+    ssize_t size;
+  };
+
  public:
   explicit bb_store(rpm& rpm)
       : rpm_ref_(std::ref(rpm)),
         local_block_{rpm_ref_.get(), rpm.topo().intra_rank()},
         local_ring_{create_local_ring()},
         rpm_blocks_{rpm_ref_.get()},
-        remote_rings_{create_remote_rings()} {}
+        remote_rings_{create_remote_rings()},
+        ino_and_size_dtype_{create_ino_and_size_dtype()} {}
 
   auto save() -> void {
     // save bb indices
@@ -340,9 +346,8 @@ class bb_store {
       flags &= ~(O_CREAT | O_EXCL | O_TRUNC);
     }
 
-    rpmbb::deferred_file file{pathname, flags, mode};
-    ino_t ino;
-    ssize_t file_size = -1;
+    auto file = rpmbb::deferred_file{pathname, flags, mode};
+    auto meta = ino_and_size{0, -1};
     try {
       if (comm.rank() == 0) {
         file.open();
@@ -353,25 +358,23 @@ class bb_store {
                                   "bb_store::open(): Failed fstat");
         }
 
-        ino = stat_buf.st_ino;
-        file_size = stat_buf.st_size;
+        meta.ino = stat_buf.st_ino;
+        meta.size = static_cast<ssize_t>(stat_buf.st_size);
       }
     } catch (...) {
     }
 
-    // TODO: make derived datatype for file_size and ino then broadcast once
-    comm.broadcast(file_size);
-    if (file_size < 0) {
+    comm.broadcast(meta, ino_and_size_dtype_);
+    if (meta.size < 0) {
       throw std::system_error{errno, std::system_category(),
                               "bb_store::open(): Failed to get file size"};
     }
-    comm.broadcast(ino);
 
-    auto bb_obj = std::make_shared<bb>(bb{ino});
+    auto bb_obj = std::make_shared<bb>(bb{meta.ino});
     auto [it, inserted] = bb_store_.insert(bb_obj);
     return std::make_unique<bb_handler>(rpm_ref_.get(), local_ring_,
                                         remote_rings_, *it, std::move(comm),
-                                        std::move(file), file_size);
+                                        std::move(file), meta.size);
   }
 
   void unlink(const std::string& pathname) { unlink(utils::get_ino(pathname)); }
@@ -410,6 +413,17 @@ class bb_store {
     return remote_rings;
   }
 
+  auto create_ino_and_size_dtype() -> mpi::dtype {
+    auto dtypes = std::vector<MPI_Datatype>{mpi::to_dtype<ino_t>().native(),
+                                            mpi::to_dtype<ssize_t>().native()};
+    auto block_lengths = std::vector<int>{1, 1};
+    auto displacements = std::vector<MPI_Aint>{offsetof(ino_and_size, ino),
+                                               offsetof(ino_and_size, size)};
+    auto dtype = mpi::dtype{dtypes, block_lengths, displacements};
+    dtype.commit();
+    return dtype;
+  }
+
   auto save_block_metadata_to_local_block(const block_metadata& meta) -> void {
     local_block_.pwrite_nt(
         std::span<const std::byte>{reinterpret_cast<const std::byte*>(&meta),
@@ -429,6 +443,7 @@ class bb_store {
   local_ring_buffer local_ring_;
   rpm_blocks rpm_blocks_;
   std::vector<remote_ring_buffer> remote_rings_;
+  mpi::dtype ino_and_size_dtype_;
 };
 
 }  // namespace rpmbb

@@ -344,3 +344,32 @@ TEST_CASE("mpi") {
     CHECK(derived_dtype.is_basic() == false);
   }
 }
+
+TEST_CASE("dtype") {
+  struct test_struct {
+    int a = 0;
+    double b = 0.;
+  };
+
+  test_struct test_data;
+
+  if (mpi::comm::world().rank() == 0) {
+    test_data.a = 42;
+    test_data.b = 3.14;
+  }
+
+  auto dtypes = std::vector<MPI_Datatype>{MPI_INT, MPI_DOUBLE};
+  std::vector<int> block_length = {1, 1};
+  std::vector<MPI_Aint> displacements = {offsetof(test_struct, a),
+                                         offsetof(test_struct, b)};
+  auto test_dtype = mpi::dtype{dtypes, block_length, displacements};
+  test_dtype.commit();
+
+  auto [lb, extent] = test_dtype.extent_x();
+  MESSAGE("size: ", test_dtype.size(), ", lb: ", lb, ", extent: ", extent);
+
+  mpi::comm::world().broadcast(test_data, test_dtype, 0);
+
+  CHECK(test_data.a == 42);
+  CHECK(test_data.b == doctest::Approx(3.14));
+}
