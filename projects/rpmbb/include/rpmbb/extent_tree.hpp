@@ -12,8 +12,8 @@
 namespace rpmbb {
 
 struct extent {
-  uint64_t begin{};
-  uint64_t end{};
+  uint64_t begin{0};
+  uint64_t end{0};
 
   using serialize = zpp::bits::members<2>;
 

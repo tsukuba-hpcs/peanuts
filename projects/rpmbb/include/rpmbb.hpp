@@ -2,6 +2,7 @@
 #include "rpmbb/bb.hpp"
 #include "rpmbb/deferred_file.hpp"
 #include "rpmbb/extent_tree.hpp"
+#include "rpmbb/sparse_extent.hpp"
 #include "rpmbb/inspector.hpp"
 #include "rpmbb/mpi.hpp"
 #include "rpmbb/options.hpp"
