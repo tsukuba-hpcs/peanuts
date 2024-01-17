@@ -21,6 +21,19 @@ struct sparse_extent {
       : ex(begin, begin + extent_size), hole(hole), count(count) {}
   explicit sparse_extent(const extent& ex) : ex{ex}, hole{0}, count{1} {}
 
+  void normalize() {
+    if (count <= 1) {
+      hole = 0;
+    }
+    if (hole == 0 && count > 1) {
+      ex.end = ex.begin + extent_size() * count;
+      count = 1;
+    }
+  }
+
+  uint64_t start() const { return ex.begin; }
+  uint64_t stop() const { return ex.begin + size(); }
+
   size_t extent_size() const { return ex.size(); }
   size_t stride_size() const { return ex.size() + hole; }
   size_t hole_size() const { return hole; }
@@ -41,39 +54,109 @@ struct sparse_extent {
     return true_extent().overlaps(other.true_extent());
   }
 
-  auto slice_start_at(uint64_t pos) const
-      -> std::pair<sparse_extent, sparse_extent> {
-    assert(pos >= ex.begin && pos < ex.end);
-    auto index = get_stride_index_at(pos);
-    auto stride_start = ex.begin + index * stride_size();
-    auto in_hole = stride_start + extent_size() <= pos;
-    auto first = sparse_extent{};
-    auto second = sparse_extent{};
-    if (!in_hole) {
-      first = sparse_extent{pos, (pos - stride_start) - extent_size(), 0, 1};
-    }
-    auto remaining_count = count - static_cast<uint32_t>(index + 1);
-    if (remaining_count > 0) {
-      second = sparse_extent{(index + 1) * stride_size(), extent_size(),
-                             remaining_count >= 2 ? hole : 0, remaining_count};
-    }
-    return {first, second};
-  }
-
-  // auto slice_stop_at(uint64_t pos) const
-  //     -> std::pair<sparse_extent, sparse_extent> {
-    // assert(pos >= ex.begin && pos < ex.end);
-    // auto index = get_stride_index_at(pos);
-    // auto stride_start = index * stride_size();
-  // }
-
   size_t get_stride_index_at(uint64_t pos) const {
-    assert(pos >= ex.begin && pos < ex.end);
+    assert(pos >= ex.begin && pos < outer_extent().end);
     return (pos - ex.begin) / stride_size();
   }
 
+  size_t get_shifted_stride_index_at(uint64_t pos) const {
+    assert(pos >= ex.begin && pos < outer_extent().end);
+    return (pos + hole - ex.begin) / stride_size();
+  }
+
+  auto get_first_slice_start_at(uint64_t pos) -> sparse_extent {
+    assert(pos >= ex.begin && pos < outer_extent().end);
+
+    auto start_stride_idx =
+        static_cast<decltype(count)>((pos + hole - ex.begin) / stride_size());
+    if (start_stride_idx >= count) {
+      // pos is after the last extent
+      return sparse_extent{};
+    }
+
+    auto start_stride_pos = ex.begin + start_stride_idx * stride_size();
+
+    if (pos > start_stride_pos) {
+      // pos is in the middle of the extent
+      return sparse_extent{pos, extent_size() - (pos - start_stride_pos), 0, 1};
+    }
+
+    // pos is in the hole
+    return sparse_extent{start_stride_pos, extent_size(), hole,
+                         count - start_stride_idx};
+  }
+
+  auto get_first_slice_stop_at(uint64_t pos) -> sparse_extent {
+    assert(pos >= ex.begin && pos < outer_extent().end);
+
+    if (pos <= ex.begin) {
+      // pos is before the first extent
+      return sparse_extent{};
+    }
+
+    auto stop_stride_idx =
+        static_cast<decltype(count)>((pos - ex.begin) / stride_size());
+    auto stop_stride_pos = ex.begin + stop_stride_idx * stride_size();
+
+    if (pos < stop_stride_pos + extent_size()) {
+      // pos is in the middle of the extent
+      if (stop_stride_idx == 0) {
+        return sparse_extent{ex.begin, pos - ex.begin, 0, 1};
+      } else {
+        stop_stride_idx--;
+      }
+    }
+
+    return sparse_extent{ex.begin, extent_size(), hole, stop_stride_idx + 1};
+  }
+
+  auto get_first_slice(uint64_t start, uint64_t stop) {
+    assert(start >= ex.begin && start < outer_extent().end);
+    assert(stop > start && stop <= outer_extent().end);
+
+    auto start_stride_idx =
+        static_cast<decltype(count)>((start + hole - ex.begin) / stride_size());
+
+    if (start_stride_idx >= count) {
+      // pos is after the last extent
+      return sparse_extent{};
+    }
+    auto start_stride_pos = ex.begin + start_stride_idx * stride_size();
+
+    uint64_t new_start;
+    if (start <= start_stride_pos) {
+      // start is in the hole
+      new_start = start_stride_pos;
+    } else {
+      // start is in the middle of the extent
+      new_start = start;
+    }
+
+    auto stop_stride_idx =
+        static_cast<decltype(count)>((stop - ex.begin) / stride_size());
+    auto stop_stride_pos = ex.begin + stop_stride_idx * stride_size();
+
+    if (stop < stop_stride_pos + extent_size()) {
+      // stop is in the middle of the extent
+      if (stop_stride_idx == start_stride_idx) {
+        return sparse_extent{new_start, stop - new_start, 0, 1};
+      } else {
+        stop_stride_idx--;
+      }
+    }
+
+    if (start <= start_stride_pos) {
+      // both start and stop are in the hole
+      return sparse_extent{new_start, extent_size(), hole,
+                           stop_stride_idx - start_stride_idx + 1};
+    } else {
+      return sparse_extent{new_start,
+                           extent_size() - (start - start_stride_pos), 0, 1};
+    }
+  }
+
   bool is_in_hole(uint64_t pos) const {
-    assert(pos >= ex.begin && pos < ex.end);
+    assert(pos >= ex.begin && pos < outer_extent().end);
     return (pos - ex.begin) % stride_size() >= extent_size();
   }
 
