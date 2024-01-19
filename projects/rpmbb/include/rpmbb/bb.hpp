@@ -96,6 +96,10 @@ class bb_handler {
       bb_->local_tree.remove(size, UINT64_MAX);
     }
 
+    if (bb_->global_tree.size() != 0 && bb_->global_tree.back().ex.end > size) {
+      bb_->global_tree.remove(size, UINT64_MAX);
+    }
+
     deferred_file_size_ = size;
   }
 
