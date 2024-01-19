@@ -373,6 +373,7 @@ class bb_store {
             int flags,
             mode_t mode) {
 #ifndef RPMBB_USE_DEFERRED_OPEN
+#warning "RPMBB_USE_DEFERRED_OPEN is not defined. This may cause performance degradation."
     auto meta = ino_and_size{0, -1};
     auto file = rpmbb::deferred_file{pathname, flags, mode};
     try {
