@@ -13,6 +13,7 @@ class Openmpi(BuiltinOpenmpi):
     version("5.0.0rc12-pmembb", branch="pmembb", submodules=True)
 
     variant('pmembb', default=False, description='Support pmembb', when='+romio')
+    variant('aggregate_read', default=True, description='Enable aggregate read optimization', when='+pmembb')
     variant('debug', default=False, description='Enable debug')
 
     def configure_args(self):
@@ -21,7 +22,15 @@ class Openmpi(BuiltinOpenmpi):
         if spec.satisfies("@5:") and not spec.satisfies("schedulers=tm"):
             config_args.append("--without-pbs")
         if spec.satisfies("+pmembb"):
-            config_args.append("--with-io-romio-flags=--with-file-system=testfs+ufs+pmembb")
+            romio_flags=[
+                "--with-file-system=testfs+ufs+pmembb",
+            ]
+            if spec.satisfies("+aggregate_read"):
+                romio_flags.append("--enable-pmembb-aggregate-read")
+            else:
+                romio_flags.append("--disable-pmembb-aggregate-read")
+
+            config_args.append("--with-io-romio-flags=" + " ".join(romio_flags))
         if spec.satisfies("+debug"):
             config_args.append("--enable-debug")
 
