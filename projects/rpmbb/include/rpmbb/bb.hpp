@@ -1,5 +1,6 @@
 #pragma once
 
+#include "rpmbb/config.hpp"
 #include "rpmbb/deferred_file.hpp"
 #include "rpmbb/extent_list.hpp"
 #include "rpmbb/extent_tree.hpp"
@@ -371,6 +372,21 @@ class bb_store {
             const std::string& pathname,
             int flags,
             mode_t mode) {
+#ifndef RPMBB_USE_DEFERRED_OPEN
+    auto meta = ino_and_size{0, -1};
+    auto file = rpmbb::deferred_file{pathname, flags, mode};
+    try {
+      file.open();
+      struct stat stat_buf;
+      if (fstat(file.fd(), &stat_buf) != 0) {
+        throw std::system_error(errno, std::system_category(),
+                                "bb_store::open(): Failed fstat");
+      }
+      meta.ino = stat_buf.st_ino;
+      meta.size = static_cast<ssize_t>(stat_buf.st_size);
+    } catch (...) {
+    }
+#else
     if (comm.rank() != 0) {
       flags &= ~(O_CREAT | O_EXCL | O_TRUNC);
     }
@@ -392,6 +408,7 @@ class bb_store {
       }
     } catch (...) {
     }
+#endif
 
     comm.broadcast(meta, ino_and_size_dtype_);
     if (meta.size < 0) {

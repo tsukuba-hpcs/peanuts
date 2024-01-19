@@ -13,11 +13,12 @@ class Rpmbb(CMakePackage):
     # url = ""
     git      = "https://github.com/tsukuba-hpcs/rpmembb.git"
 
-
     maintainers("range3")
 
+    variant('deferred_open', default=True, description='use deferred open')
+
     version("master", branch="master")
-    version("0.4.0", tag="v0.4.0")
+    version("0.6.0", tag="v0.6.0")
 
     depends_on("mpi")
     depends_on("pmdk+ndctl")
@@ -30,5 +31,5 @@ class Rpmbb(CMakePackage):
         env.unset('CPM_SOURCE_CACHE')
 
     def cmake_args(self):
-        args = []
+        args = [self.define_from_variant('RPMBB_USE_DEFERRED_OPEN', 'deferred_open')]
         return args

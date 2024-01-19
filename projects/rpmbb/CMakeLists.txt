@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.14...3.22)
 
 project(
   rpmbb
-  VERSION 0.5.0
+  VERSION 0.6.0
   LANGUAGES CXX C
 )
 string(TOLOWER ${PROJECT_NAME} PROJECT_NAME_LOWERCASE)
@@ -20,6 +20,7 @@ endif()
 
 # ---- Options ----
 option(BUILD_TESTS "Build testing executables" ON)
+option(${PROJECT_NAME_UPPERCASE}_USE_DEFERRED_OPEN "Use deferred open" ON)
 
 # ---- Set default build type ----
 # Encourage user to specify a build type (e.g. Release, Debug, etc.), otherwise set it to Release.
@@ -94,6 +95,12 @@ pkg_check_modules(
 )
 
 # ---- headers ----
+# config.h
+configure_file(config.hpp.in ${PROJECT_BINARY_DIR}/include/rpmbb/config.hpp)
+install(FILES ${PROJECT_BINARY_DIR}/include/rpmbb/config.hpp
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}-${PROJECT_VERSION}/rpmbb"
+)
+
 file(
   GLOB_RECURSE
   ${PROJECT_NAME}_headers
@@ -105,12 +112,12 @@ add_library(${PROJECT_NAME} INTERFACE ${${PROJECT_NAME}_headers})
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
 target_include_directories(
-  ${PROJECT_NAME} INTERFACE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
-                            "$<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>"
+  ${PROJECT_NAME}
+  INTERFACE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
+            "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>"
+            "$<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>"
 )
-target_link_libraries(
-  ${PROJECT_NAME} INTERFACE MPI::MPI_C PkgConfig::Libpmem2 PkgConfig::Liburing
-)
+target_link_libraries(${PROJECT_NAME} INTERFACE MPI::MPI_C PkgConfig::Libpmem2 PkgConfig::Liburing)
 
 include(cmake/version.cmake)
 target_add_version_header(
