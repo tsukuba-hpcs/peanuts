@@ -105,7 +105,17 @@ class bb_handler {
   }
 
   // collective
-  auto sync() {
+  void sync() {
+    sync_extent();
+    sync_file_size();
+  }
+
+  // collective
+  void sync_extent() {
+    if (comm_.size() == 1) {
+      return;
+    }
+
     // serialize local extent tree
     auto [ser_local_tree, out] = zpp::bits::data_out();
     out(bb_->local_tree).or_throw();
@@ -136,8 +146,23 @@ class bb_handler {
     if (comm_.size() == rpm().topo().size()) {
       bb_->local_tree.clear();
     }
+  }
 
-    deferred_file_size_ = get_and_broadcast_file_size();
+  // collective
+  auto sync_file_size() -> void {
+    ssize_t file_size = -1;
+    if (comm_.rank() == 0) {
+      try {
+        file_size = file_.size();
+      } catch (...) {
+      }
+    }
+    comm_.broadcast(file_size);
+    if (file_size < 0) {
+      throw std::system_error{errno, std::system_category(),
+                              "Failed to get file size"};
+    }
+    deferred_file_size_ = file_size;
   }
 
   auto pwrite(std::span<const std::byte> buf, off_t ofs) const -> ssize_t {
@@ -274,22 +299,6 @@ class bb_handler {
   }
   auto rpm() const -> rpm& { return rpm_ref_.get(); }
 
-  auto get_and_broadcast_file_size() -> ssize_t {
-    ssize_t file_size = -1;
-    if (comm_.rank() == 0) {
-      try {
-        file_size = file_.size();
-      } catch (...) {
-      }
-    }
-    comm_.broadcast(file_size);
-    if (file_size < 0) {
-      throw std::system_error{errno, std::system_category(),
-                              "Failed to get file size"};
-    }
-    return file_size;
-  }
-
  private:
   std::reference_wrapper<rpmbb::rpm> rpm_ref_;
   std::reference_wrapper<local_ring_buffer> local_ring_;
@@ -375,7 +384,8 @@ class bb_store {
             int flags,
             mode_t mode) {
 #ifndef RPMBB_USE_DEFERRED_OPEN
-#warning "RPMBB_USE_DEFERRED_OPEN is not defined. This may cause performance degradation."
+#warning \
+    "RPMBB_USE_DEFERRED_OPEN is not defined. This may cause performance degradation."
     auto meta = ino_and_size{0, -1};
     auto file = rpmbb::deferred_file{pathname, flags, mode};
     try {
@@ -421,9 +431,11 @@ class bb_store {
 
     auto bb_obj = std::make_shared<bb>(bb{meta.ino});
     auto [it, inserted] = bb_store_.insert(bb_obj);
-    return std::make_unique<bb_handler>(rpm_ref_.get(), local_ring_,
-                                        remote_rings_, *it, std::move(comm),
-                                        std::move(file), meta.size);
+    auto handler = std::make_unique<bb_handler>(
+        rpm_ref_.get(), local_ring_, remote_rings_, *it, std::move(comm),
+        std::move(file), meta.size);
+    handler->sync_extent();
+    return handler;
   }
 
   void unlink(const std::string& pathname) { unlink(utils::get_ino(pathname)); }

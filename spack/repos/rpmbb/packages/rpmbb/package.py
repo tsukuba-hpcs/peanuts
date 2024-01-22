@@ -18,7 +18,7 @@ class Rpmbb(CMakePackage):
     variant('deferred_open', default=True, description='use deferred open')
 
     version("master", branch="master")
-    version("0.7.0", tag="v0.7.0")
+    version("0.8.0", tag="v0.8.0")
 
     depends_on("mpi")
     depends_on("pmdk+ndctl")
