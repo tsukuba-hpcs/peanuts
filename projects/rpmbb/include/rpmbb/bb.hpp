@@ -132,8 +132,10 @@ class bb_handler {
       bb_->global_tree.merge(tmp_tree);
     }
 
-    // clear merged local tree
-    bb_->local_tree.clear();
+    // clear merged local tree if all ranks have been synced
+    if (comm_.size() == rpm().topo().size()) {
+      bb_->local_tree.clear();
+    }
 
     deferred_file_size_ = get_and_broadcast_file_size();
   }
