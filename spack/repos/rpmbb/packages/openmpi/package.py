@@ -11,6 +11,7 @@ class Openmpi(BuiltinOpenmpi):
     git = "https://github.com/tsukuba-hpcs/ompi-pmembb.git"
 
     version("5.0.0rc12-pmembb", branch="pmembb", submodules=True)
+    version("5.0.0rc12-pmembb-eval", branch="pmembb-eval", submodules=True)
 
     variant('pmembb', default=False, description='Support pmembb', when='+romio')
     variant('aggregate_read', default=True, description='Enable aggregate read optimization', when='+pmembb')
