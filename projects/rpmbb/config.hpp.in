@@ -1,2 +1,3 @@
 #cmakedefine RPMBB_USE_DEFERRED_OPEN
 #cmakedefine RPMBB_USE_AGG_READ
+#cmakedefine RPMBB_ENABLE_PROFILER

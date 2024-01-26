@@ -8,9 +8,14 @@
 #include "rpmbb/ring_buffer.hpp"
 #include "rpmbb/rpm.hpp"
 #include "rpmbb/utils/fs.hpp"
+#include "rpmbb/utils/stopwatch.hpp"
 
 #include <zpp/file.h>
 #include <zpp_bits.h>
+
+#ifdef RPMBB_ENABLE_PROFILER
+#include <fmt/format.h>
+#endif
 
 #include <sys/types.h>
 #include <functional>
@@ -396,6 +401,10 @@ class bb_store {
             const std::string& pathname,
             int flags,
             mode_t mode) {
+#ifdef RPMBB_ENABLE_PROFILER
+    auto sw = utils::stopwatch<>{};
+#endif
+
 #ifndef RPMBB_USE_DEFERRED_OPEN
 #warning \
     "RPMBB_USE_DEFERRED_OPEN is not defined. This may cause performance degradation."
@@ -447,7 +456,15 @@ class bb_store {
     auto handler = std::make_unique<bb_handler>(
         rpm_ref_.get(), local_ring_, remote_rings_, *it, std::move(comm),
         std::move(file), meta.size);
+#ifdef RPMBB_ENABLE_PROFILER
+    auto elapsed_open = sw.get_and_reset();
     handler->sync_extent();
+    auto elapsed_sync = sw.get_and_reset();
+    if (comm.rank() == 0) {
+      fmt::print("rpmbb::elapsed::open: {}\n", elapsed_open.count()); 
+      fmt::print("rpmbb::elapsed::sync_extent: {}\n", elapsed_sync.count());
+    }
+#endif
     return handler;
   }
 
