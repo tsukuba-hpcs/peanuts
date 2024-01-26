@@ -179,7 +179,11 @@ class bb_handler {
     return buf.size();
   }
 
-  auto flush() const -> void { rring(0).flush(); }
+  auto flush() const -> void {
+#ifdef RPMBB_USE_AGG_READ
+    rring(0).flush();
+#endif
+  }
 
   auto pread(std::span<std::byte> buf, off_t ofs) -> ssize_t {
     auto ret = pread_noflush(buf, ofs);
@@ -235,7 +239,13 @@ class bb_handler {
 
           // read from remote rings
           rring(global_it->client_id)
+#ifdef RPMBB_USE_AGG_READ
               .pread_noflush(
+#else
+#warning \
+    "RPMBB_USE_AGG_READ is not defined. This may cause performance degradation."
+              .pread(
+#endif
                   buf.subspan(valid_ex.begin - ofs, valid_ex.size()),
                   global_it->ptr + (valid_ex.begin - global_ex.begin));
 

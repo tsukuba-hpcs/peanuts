@@ -21,6 +21,7 @@ endif()
 # ---- Options ----
 option(BUILD_TESTS "Build testing executables" ON)
 option(${PROJECT_NAME_UPPERCASE}_USE_DEFERRED_OPEN "Use deferred open" ON)
+option(${PROJECT_NAME_UPPERCASE}_USE_AGG_READ "Use aggregate read" ON)
 
 # ---- Set default build type ----
 # Encourage user to specify a build type (e.g. Release, Debug, etc.), otherwise set it to Release.
