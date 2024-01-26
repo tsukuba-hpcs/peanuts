@@ -128,6 +128,9 @@ class bb_handler {
     // all_gather_v serialized local tree
     auto [ser_local_trees, in] = zpp::bits::data_in();
     ser_local_trees.resize(std::accumulate(sizes.begin(), sizes.end(), 0ULL));
+    if (ser_local_trees.size() == 0) {
+      return;
+    }
     comm_.all_gather_v(std::as_bytes(std::span{ser_local_tree}),
                        std::as_writable_bytes(std::span{ser_local_trees}),
                        std::span{sizes});
