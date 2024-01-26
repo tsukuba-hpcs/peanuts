@@ -20,7 +20,7 @@ class Rpmbb(CMakePackage):
     variant("profiler", default=False, description="enable profiler")
 
     version("master", branch="master")
-    version("0.10.0", tag="v0.10.0")
+    version("0.10.1", tag="v0.10.1")
 
     depends_on("mpi")
     depends_on("pmdk+ndctl")
