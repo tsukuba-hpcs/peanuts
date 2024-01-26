@@ -405,6 +405,8 @@ class bb_store {
     auto sw = utils::stopwatch<>{};
 #endif
 
+    auto myrank = comm.rank();
+
 #ifndef RPMBB_USE_DEFERRED_OPEN
 #warning \
     "RPMBB_USE_DEFERRED_OPEN is not defined. This may cause performance degradation."
@@ -422,14 +424,14 @@ class bb_store {
     } catch (...) {
     }
 #else
-    if (comm.rank() != 0) {
+    if (myrank != 0) {
       flags &= ~(O_CREAT | O_EXCL | O_TRUNC);
     }
 
     auto file = rpmbb::deferred_file{pathname, flags, mode};
     auto meta = ino_and_size{0, -1};
     try {
-      if (comm.rank() == 0) {
+      if (myrank == 0) {
         file.open();
 
         struct stat stat_buf;
@@ -451,6 +453,9 @@ class bb_store {
                               "bb_store::open(): Failed to get file size"};
     }
 
+#ifdef RPMBB_ENABLE_PROFILER
+#endif
+
     auto bb_obj = std::make_shared<bb>(bb{meta.ino});
     auto [it, inserted] = bb_store_.insert(bb_obj);
     auto handler = std::make_unique<bb_handler>(
@@ -458,9 +463,11 @@ class bb_store {
         std::move(file), meta.size);
 #ifdef RPMBB_ENABLE_PROFILER
     auto elapsed_open = sw.get_and_reset();
+#endif
     handler->sync_extent();
+#ifdef RPMBB_ENABLE_PROFILER
     auto elapsed_sync = sw.get_and_reset();
-    if (comm.rank() == 0) {
+    if (myrank == 0) {
       fmt::print("rpmbb::elapsed::open: {}\n", elapsed_open.count()); 
       fmt::print("rpmbb::elapsed::sync_extent: {}\n", elapsed_sync.count());
     }

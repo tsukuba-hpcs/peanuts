@@ -373,3 +373,9 @@ TEST_CASE("dtype") {
   CHECK(test_data.a == 42);
   CHECK(test_data.b == doctest::Approx(3.14));
 }
+
+TEST_CASE("MPI_COMM_SELF") {
+  auto comm = mpi::comm{MPI_COMM_SELF};
+  CHECK(comm.size() == 1);
+  CHECK(comm.rank() == 0);
+}
