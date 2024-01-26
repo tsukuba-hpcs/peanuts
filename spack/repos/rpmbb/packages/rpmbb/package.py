@@ -15,7 +15,8 @@ class Rpmbb(CMakePackage):
 
     maintainers("range3")
 
-    variant('deferred_open', default=True, description='use deferred open')
+    variant("deferred_open", default=True, description="use deferred open")
+    variant("agg_read", default=True, description="use aggregate read")
 
     version("master", branch="master")
     version("0.8.0", tag="v0.8.0")
@@ -28,8 +29,11 @@ class Rpmbb(CMakePackage):
     conflicts("%gcc@:9")
 
     def setup_build_environment(self, env):
-        env.unset('CPM_SOURCE_CACHE')
+        env.unset("CPM_SOURCE_CACHE")
 
     def cmake_args(self):
-        args = [self.define_from_variant('RPMBB_USE_DEFERRED_OPEN', 'deferred_open')]
+        args = [
+            self.define_from_variant("RPMBB_USE_DEFERRED_OPEN", "deferred_open"),
+            self.define_from_variant("RPMBB_USE_AGG_READ", "agg_read"),
+        ]
         return args
