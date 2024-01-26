@@ -17,9 +17,10 @@ class Rpmbb(CMakePackage):
 
     variant("deferred_open", default=True, description="use deferred open")
     variant("agg_read", default=True, description="use aggregate read")
+    variant("profiler", default=False, description="enable profiler")
 
     version("master", branch="master")
-    version("0.9.0", tag="v0.9.0")
+    version("0.10.0", tag="v0.10.0")
 
     depends_on("mpi")
     depends_on("pmdk+ndctl")
@@ -35,5 +36,6 @@ class Rpmbb(CMakePackage):
         args = [
             self.define_from_variant("RPMBB_USE_DEFERRED_OPEN", "deferred_open"),
             self.define_from_variant("RPMBB_USE_AGG_READ", "agg_read"),
+            self.define_from_variant("RPMBB_ENABLE_PROFILER", "profiler"),
         ]
         return args
