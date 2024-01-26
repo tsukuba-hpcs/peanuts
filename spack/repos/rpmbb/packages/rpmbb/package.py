@@ -19,7 +19,7 @@ class Rpmbb(CMakePackage):
     variant("agg_read", default=True, description="use aggregate read")
 
     version("master", branch="master")
-    version("0.8.0", tag="v0.8.0")
+    version("0.9.0", tag="v0.9.0")
 
     depends_on("mpi")
     depends_on("pmdk+ndctl")
