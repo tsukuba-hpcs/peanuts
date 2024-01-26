@@ -119,7 +119,7 @@ target_include_directories(
             "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>"
             "$<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>"
 )
-target_link_libraries(${PROJECT_NAME} INTERFACE MPI::MPI_C PkgConfig::Libpmem2 PkgConfig::Liburing)
+target_link_libraries(${PROJECT_NAME} INTERFACE MPI::MPI_C PkgConfig::Libpmem2 PkgConfig::Liburing fmt::fmt)
 
 include(cmake/version.cmake)
 target_add_version_header(
