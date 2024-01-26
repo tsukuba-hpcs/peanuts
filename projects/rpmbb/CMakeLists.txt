@@ -55,7 +55,7 @@ CPMAddPackage(
   NAME fmt
   GIT_TAG 10.0.0
   GITHUB_REPOSITORY fmtlib/fmt
-  OPTIONS "FMT_INSTALL YES" # create an installable target
+  OPTIONS "FMT_INSTALL YES" "FMT_HEADER_ONLY" # create an installable target
   EXCLUDE_FROM_ALL YES
 )
 
@@ -119,7 +119,7 @@ target_include_directories(
             "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>"
             "$<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>"
 )
-target_link_libraries(${PROJECT_NAME} INTERFACE MPI::MPI_C PkgConfig::Libpmem2 PkgConfig::Liburing fmt::fmt)
+target_link_libraries(${PROJECT_NAME} INTERFACE MPI::MPI_C PkgConfig::Libpmem2 PkgConfig::Liburing fmt::fmt-header-only)
 
 include(cmake/version.cmake)
 target_add_version_header(
