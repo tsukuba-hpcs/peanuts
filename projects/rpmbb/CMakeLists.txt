@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.14...3.22)
 
 project(
   rpmbb
-  VERSION 0.10.2
+  VERSION 0.10.3
   LANGUAGES CXX C
 )
 string(TOLOWER ${PROJECT_NAME} PROJECT_NAME_LOWERCASE)
