@@ -6,11 +6,11 @@ x-common: &x-common
   environment:
     MPI_HOSTS: h1,h2,h3,h4
   volumes:
-    - ..:/workspaces/rpmembb:cached
+    - ..:/workspaces/peanuts:cached
     - spack-root:/home/vscode/.cache/spack
     - spack-settings:/home/vscode/.spack
   networks:
-    - rpmembb_net
+    - peanuts_net
   cap_add:
     - SYS_PTRACE
   security_opt:
@@ -23,22 +23,22 @@ services:
   h1:
     <<: *x-common
     hostname: h1
-    container_name: rpmembb-h1
+    container_name: peanuts-h1
   h2:
     <<: *x-common
     hostname: h2
-    container_name: rpmembb-h2
+    container_name: peanuts-h2
   h3:
     <<: *x-common
     hostname: h3
-    container_name: rpmembb-h3
+    container_name: peanuts-h3
   h4:
     <<: *x-common
     hostname: h4
-    container_name: rpmembb-h4
+    container_name: peanuts-h4
 
 networks:
-  rpmembb_net:
+  peanuts_net:
 
 volumes:
   spack-root:
