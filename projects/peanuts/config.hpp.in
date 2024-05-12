@@ -1,0 +1,3 @@
+#cmakedefine PEANUTS_USE_DEFERRED_OPEN
+#cmakedefine PEANUTS_USE_AGG_READ
+#cmakedefine PEANUTS_ENABLE_PROFILER

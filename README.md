@@ -1,4 +1,4 @@
-# librpmbb, librpmbb_c
+# peanuts.hpp, libpeanuts_c
 ## install
 ```bash
 make build
